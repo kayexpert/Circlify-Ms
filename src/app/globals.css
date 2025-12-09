@@ -1,0 +1,912 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* UI Reference Design System - Light theme - default values */
+:root {
+    --background: #ffffff;
+    --foreground: #101828;
+    --card: #ffffff;
+    --card-foreground: #101828;
+    --popover: #ffffff;
+    --popover-foreground: #101828;
+    --primary: #465fff;
+    --primary-foreground: #ffffff;
+    --secondary: #f2f4f7;
+    --secondary-foreground: #101828;
+    --muted: #f2f4f7;
+    --muted-foreground: #667085;
+    --accent: #f2f4f7;
+    --accent-foreground: #101828;
+    --destructive: #f04438;
+    --destructive-foreground: #ffffff;
+    --border: #e4e7ec;
+    --input: #e4e7ec;
+    --ring: #465fff;
+    
+    /* Brand colors */
+    --brand-25: #f2f7ff;
+    --brand-50: #ecf3ff;
+    --brand-100: #dde9ff;
+    --brand-200: #c2d6ff;
+    --brand-300: #9cb9ff;
+    --brand-400: #7592ff;
+    --brand-500: #465fff;
+    --brand-600: #3641f5;
+    --brand-700: #2a31d8;
+    --brand-800: #252dae;
+    --brand-900: #262e89;
+    --brand-950: #161950;
+    
+    /* Gray colors */
+    --gray-25: #fcfcfd;
+    --gray-50: #f9fafb;
+    --gray-100: #f2f4f7;
+    --gray-200: #e4e7ec;
+    --gray-300: #d0d5dd;
+    --gray-400: #98a2b3;
+    --gray-500: #667085;
+    --gray-600: #475467;
+    --gray-700: #344054;
+    --gray-800: #1d2939;
+    --gray-900: #101828;
+    --gray-950: #0c111d;
+    --gray-dark: #1a2231;
+    
+    /* Success colors */
+    --success-25: #f6fef9;
+    --success-50: #ecfdf3;
+    --success-100: #d1fadf;
+    --success-200: #a6f4c5;
+    --success-300: #6ce9a6;
+    --success-400: #32d583;
+    --success-500: #12b76a;
+    --success-600: #039855;
+    --success-700: #027a48;
+    --success-800: #05603a;
+    --success-900: #054f31;
+    --success-950: #053321;
+    
+    /* Error colors */
+    --error-25: #fffbfa;
+    --error-50: #fef3f2;
+    --error-100: #fee4e2;
+    --error-200: #fecdca;
+    --error-300: #fda29b;
+    --error-400: #f97066;
+    --error-500: #f04438;
+    --error-600: #d92d20;
+    --error-700: #b42318;
+    --error-800: #912018;
+    --error-900: #7a271a;
+    --error-950: #55160c;
+    
+    /* Warning colors */
+    --warning-25: #fffcf5;
+    --warning-50: #fffaeb;
+    --warning-100: #fef0c7;
+    --warning-200: #fedf89;
+    --warning-300: #fec84b;
+    --warning-400: #fdb022;
+    --warning-500: #f79009;
+    --warning-600: #dc6803;
+    --warning-700: #b54708;
+    --warning-800: #93370d;
+    --warning-900: #7a2e0e;
+    --warning-950: #4e1d09;
+}
+
+/* Dark theme - override values */
+.dark {
+    --background: #0c111d;
+    --foreground: #ffffff;
+    --card: #1a2231;
+    --card-foreground: #ffffff;
+    --popover: #1a2231;
+    --popover-foreground: #ffffff;
+    --primary: #465fff;
+    --primary-foreground: #ffffff;
+    --secondary: #1d2939;
+    --secondary-foreground: #ffffff;
+    --muted: #1d2939;
+    --muted-foreground: #98a2b3;
+    --accent: #1d2939;
+    --accent-foreground: #ffffff;
+    --destructive: #f04438;
+    --destructive-foreground: #ffffff;
+    --border: #344054;
+    --input: #344054;
+    --ring: #465fff;
+}
+
+@theme {
+    /* Define Tailwind color utilities - these reference the CSS variables defined above */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    
+    /* Brand colors */
+    --color-brand-25: var(--brand-25);
+    --color-brand-50: var(--brand-50);
+    --color-brand-100: var(--brand-100);
+    --color-brand-200: var(--brand-200);
+    --color-brand-300: var(--brand-300);
+    --color-brand-400: var(--brand-400);
+    --color-brand-500: var(--brand-500);
+    --color-brand-600: var(--brand-600);
+    --color-brand-700: var(--brand-700);
+    --color-brand-800: var(--brand-800);
+    --color-brand-900: var(--brand-900);
+    --color-brand-950: var(--brand-950);
+    
+    /* Gray colors */
+    --color-gray-25: var(--gray-25);
+    --color-gray-50: var(--gray-50);
+    --color-gray-100: var(--gray-100);
+    --color-gray-200: var(--gray-200);
+    --color-gray-300: var(--gray-300);
+    --color-gray-400: var(--gray-400);
+    --color-gray-500: var(--gray-500);
+    --color-gray-600: var(--gray-600);
+    --color-gray-700: var(--gray-700);
+    --color-gray-800: var(--gray-800);
+    --color-gray-900: var(--gray-900);
+    --color-gray-950: var(--gray-950);
+    --color-gray-dark: var(--gray-dark);
+    
+    /* Success colors */
+    --color-success-25: var(--success-25);
+    --color-success-50: var(--success-50);
+    --color-success-100: var(--success-100);
+    --color-success-200: var(--success-200);
+    --color-success-300: var(--success-300);
+    --color-success-400: var(--success-400);
+    --color-success-500: var(--success-500);
+    --color-success-600: var(--success-600);
+    --color-success-700: var(--success-700);
+    --color-success-800: var(--success-800);
+    --color-success-900: var(--success-900);
+    --color-success-950: var(--success-950);
+    
+    /* Error colors */
+    --color-error-25: var(--error-25);
+    --color-error-50: var(--error-50);
+    --color-error-100: var(--error-100);
+    --color-error-200: var(--error-200);
+    --color-error-300: var(--error-300);
+    --color-error-400: var(--error-400);
+    --color-error-500: var(--error-500);
+    --color-error-600: var(--error-600);
+    --color-error-700: var(--error-700);
+    --color-error-800: var(--error-800);
+    --color-error-900: var(--error-900);
+    --color-error-950: var(--error-950);
+    
+    /* Warning colors */
+    --color-warning-25: var(--warning-25);
+    --color-warning-50: var(--warning-50);
+    --color-warning-100: var(--warning-100);
+    --color-warning-200: var(--warning-200);
+    --color-warning-300: var(--warning-300);
+    --color-warning-400: var(--warning-400);
+    --color-warning-500: var(--warning-500);
+    --color-warning-600: var(--warning-600);
+    --color-warning-700: var(--warning-700);
+    --color-warning-800: var(--warning-800);
+    --color-warning-900: var(--warning-900);
+    --color-warning-950: var(--warning-950);
+    
+    /* Text sizes - UI Reference */
+    --text-title-2xl: 72px;
+    --text-title-2xl--line-height: 90px;
+    --text-title-xl: 60px;
+    --text-title-xl--line-height: 72px;
+    --text-title-lg: 48px;
+    --text-title-lg--line-height: 60px;
+    --text-title-md: 36px;
+    --text-title-md--line-height: 44px;
+    --text-title-sm: 30px;
+    --text-title-sm--line-height: 38px;
+    --text-theme-xl: 20px;
+    --text-theme-xl--line-height: 30px;
+    --text-theme-sm: 14px;
+    --text-theme-sm--line-height: 20px;
+    --text-theme-xs: 12px;
+    --text-theme-xs--line-height: 18px;
+    
+    /* Shadows - UI Reference */
+    --shadow-theme-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+    --shadow-theme-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1), 0px 1px 2px 0px rgba(16, 24, 40, 0.06);
+    --shadow-theme-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+    --shadow-theme-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+    --shadow-theme-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
+    --shadow-focus-ring: 0px 0px 0px 4px rgba(70, 95, 255, 0.12);
+    
+    --radius: 0.5rem;
+    --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+    border-color: var(--border);
+}
+
+html {
+    color-scheme: light dark;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
+/* Optimized theme transitions - faster and more responsive */
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: inherit;
+    transition: background-color 0.2s ease-out, 
+                color 0.2s ease-out;
+    will-change: background-color, color;
+}
+
+/* Apply optimized theme transitions selectively to theme-dependent elements */
+[class*="bg-"],
+[class*="text-"],
+[class*="border-"],
+header,
+aside,
+main,
+nav,
+section,
+article,
+div[class*="card"],
+button,
+input,
+select,
+textarea {
+    transition: background-color 0.2s ease-out,
+                border-color 0.2s ease-out,
+                color 0.2s ease-out,
+                fill 0.2s ease-out,
+                stroke 0.2s ease-out;
+}
+
+/* Exclude elements that shouldn't transition or have their own transitions */
+svg[class*="animate"],
+[class*="animate-"],
+iframe,
+video,
+canvas,
+img {
+    transition: none;
+}
+
+/* Exclude data-state elements except for dialogs/sheets which need transitions */
+[data-state]:not([data-radix-dialog-content]):not([data-radix-dialog-overlay]) {
+    transition: none;
+}
+
+/* Allow sheet/dialog transitions to work - override the general data-state rule */
+[data-radix-dialog-content],
+[data-radix-dialog-overlay] {
+    transition-property: transform, opacity !important;
+    transition-duration: 0.3s !important;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1) !important;
+    will-change: transform, opacity;
+}
+
+/* Faster transitions for interactive states */
+button:hover,
+a:hover,
+[role="button"]:hover,
+button:active,
+a:active,
+[role="button"]:active {
+    transition: background-color 0.15s ease,
+                border-color 0.15s ease,
+                color 0.15s ease,
+                transform 0.15s ease,
+                opacity 0.15s ease,
+                box-shadow 0.15s ease;
+}
+
+/* Dialog animations - Custom CSS for smooth transitions */
+[data-slot="dialog-content"] {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+                opacity 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-slot="dialog-content"][data-state="open"] {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+}
+
+[data-slot="dialog-content"][data-state="closed"] {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0;
+}
+
+[data-slot="dialog-overlay"] {
+    opacity: 0;
+    transition: opacity 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-slot="dialog-overlay"][data-state="open"] {
+    opacity: 1;
+}
+
+[data-slot="dialog-overlay"][data-state="closed"] {
+    opacity: 0;
+}
+
+/* Custom scrollbar styling - UI Reference */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--gray-200);
+    border-radius: 9999px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--gray-700);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-600);
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-200) transparent;
+}
+
+.dark .custom-scrollbar {
+    scrollbar-color: var(--gray-700) transparent;
+}
+
+/* No scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Text size utilities - UI Reference */
+.text-title-sm {
+    font-size: var(--text-title-sm);
+    line-height: var(--text-title-sm--line-height);
+}
+
+.text-title-md {
+    font-size: var(--text-title-md);
+    line-height: var(--text-title-md--line-height);
+}
+
+.text-theme-sm {
+    font-size: var(--text-theme-sm);
+    line-height: var(--text-theme-sm--line-height);
+}
+
+/* Shadow utilities - UI Reference */
+.shadow-theme-xs {
+    box-shadow: var(--shadow-theme-xs);
+}
+
+.shadow-theme-sm {
+    box-shadow: var(--shadow-theme-sm);
+}
+
+.shadow-theme-md {
+    box-shadow: var(--shadow-theme-md);
+}
+
+.shadow-theme-lg {
+    box-shadow: var(--shadow-theme-lg);
+}
+
+.shadow-theme-xl {
+    box-shadow: var(--shadow-theme-xl);
+}
+
+/* Z-index utilities - UI Reference */
+.z-1 {
+    z-index: 1;
+}
+
+.z-9 {
+    z-index: 9;
+}
+
+.z-40 {
+    z-index: 40;
+}
+
+.z-50 {
+    z-index: 50;
+}
+
+.z-999 {
+    z-index: 999;
+}
+
+.z-9999 {
+    z-index: 9999;
+}
+
+.z-99999 {
+    z-index: 99999;
+}
+
+.bg-grid-white\/10 {
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 24px 24px;
+}
+
+/* FullCalendar Styles - UI Reference */
+.fc .fc-view-harness {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.custom-scrollbar .fc .fc-view-harness {
+    scrollbar-width: thin;
+}
+
+.fc-dayGridMonth-view.fc-view.fc-daygrid {
+    min-width: 718px;
+}
+
+.fc .fc-scrollgrid-section > * {
+    border-right-width: 0;
+    border-bottom-width: 0;
+}
+
+.fc .fc-scrollgrid {
+    border-left-width: 0;
+}
+
+.fc .fc-toolbar.fc-header-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem 1.5rem 0 1.5rem;
+}
+
+@media (min-width: 640px) {
+    .fc .fc-toolbar.fc-header-toolbar {
+        flex-direction: row;
+    }
+}
+
+.fc-button-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.fc-button-group .fc-button {
+    display: flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    border: 1px solid var(--gray-200);
+    background: transparent;
+    transition: all 0.2s;
+}
+
+.fc-button-group .fc-button:hover {
+    border-color: var(--gray-200);
+    background: var(--gray-50);
+}
+
+.dark .fc-button-group .fc-button {
+    border-color: var(--gray-800);
+}
+
+.dark .fc-button-group .fc-button:hover {
+    border-color: var(--gray-800);
+    background: var(--gray-900);
+}
+
+.fc-button-group .fc-button:active,
+.fc-button-group .fc-button:focus {
+    border-color: var(--gray-200);
+    background: transparent;
+    box-shadow: none;
+}
+
+.dark .fc-button-group .fc-button:active,
+.dark .fc-button-group .fc-button:focus {
+    border-color: var(--gray-800);
+}
+
+.fc-button-group .fc-button.fc-prev-button:before {
+    display: inline-block;
+    margin-top: 0.25rem;
+    content: url("data:image/svg+xml,%3Csvg width='25' height='24' viewBox='0 0 25 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M16.0068 6L9.75684 12.25L16.0068 18.5' stroke='%23344054' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E%0A");
+}
+
+.fc-button-group .fc-button.fc-next-button:before {
+    display: inline-block;
+    margin-top: 0.25rem;
+    content: url("data:image/svg+xml,%3Csvg width='25' height='24' viewBox='0 0 25 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9.50684 19L15.7568 12.75L9.50684 6.5' stroke='%23344054' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E%0A");
+}
+
+.dark .fc-button-group .fc-button.fc-prev-button:before {
+    content: url("data:image/svg+xml,%3Csvg width='25' height='24' viewBox='0 0 25 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M16.0068 6L9.75684 12.25L16.0068 18.5' stroke='%2398A2B3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E%0A");
+}
+
+.dark .fc-button-group .fc-button.fc-next-button:before {
+    content: url("data:image/svg+xml,%3Csvg width='25' height='24' viewBox='0 0 25 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9.50684 19L15.7568 12.75L9.50684 6.5' stroke='%2398A2B3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E%0A");
+}
+
+.fc-button-group .fc-button .fc-icon {
+    display: none;
+}
+
+.fc-addEventButton-button {
+    border-radius: 0.5rem;
+    border: 0;
+    background: var(--brand-500);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    transition: all 0.2s;
+}
+
+.fc-addEventButton-button:hover {
+    background: var(--brand-600);
+    box-shadow: none;
+}
+
+.fc-toolbar-title {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: var(--gray-800);
+}
+
+.dark .fc-toolbar-title {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child {
+    border-radius: 0.5rem;
+    background: var(--gray-100);
+    padding: 0.125rem;
+}
+
+.dark .fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child {
+    background: var(--gray-900);
+}
+
+.fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button {
+    height: auto;
+    width: auto;
+    border-radius: 0.375rem;
+    border: 0;
+    background: transparent;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-500);
+    transition: all 0.2s;
+    box-shadow: none;
+}
+
+.fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button:hover {
+    color: var(--gray-700);
+}
+
+.dark .fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button {
+    color: var(--gray-400);
+}
+
+.dark .fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button.fc-button-active {
+    color: var(--gray-900);
+    background: white;
+}
+
+.dark .fc-header-toolbar.fc-toolbar .fc-toolbar-chunk:last-child .fc-button.fc-button-active {
+    color: white;
+    background: var(--gray-800);
+}
+
+.fc-theme-standard th {
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    text-align: left;
+}
+
+.dark .fc-theme-standard th {
+    border-color: var(--gray-800);
+    background: var(--gray-900);
+}
+
+.fc-theme-standard td,
+.fc-theme-standard .fc-scrollgrid {
+    border-color: var(--gray-200);
+}
+
+.dark .fc-theme-standard td,
+.dark .fc-theme-standard .fc-scrollgrid {
+    border-color: var(--gray-800);
+}
+
+.fc .fc-col-header-cell-cushion {
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--gray-400);
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+    background: transparent;
+}
+
+.fc .fc-daygrid-day {
+    padding: 0.5rem;
+}
+
+.fc .fc-daygrid-day.fc-day-today .fc-scrollgrid-sync-inner {
+    border-radius: 0.125rem;
+    background: var(--gray-100);
+}
+
+.dark .fc .fc-daygrid-day.fc-day-today .fc-scrollgrid-sync-inner {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.fc .fc-daygrid-day-number {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.dark .fc .fc-daygrid-day-number {
+    color: var(--gray-400);
+}
+
+.fc .fc-daygrid-day-top {
+    flex-direction: row;
+}
+
+.fc .fc-day-other .fc-daygrid-day-top {
+    opacity: 1;
+}
+
+.fc .fc-day-other .fc-daygrid-day-top .fc-daygrid-day-number {
+    color: var(--gray-400);
+}
+
+.dark .fc .fc-day-other .fc-daygrid-day-top .fc-daygrid-day-number {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.event-fc-color {
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem 0.625rem 1rem;
+}
+
+.event-fc-color .fc-event-title {
+    padding: 0;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: var(--gray-700);
+}
+
+.fc-daygrid-event-dot {
+    width: 0.25rem;
+    height: 1.25rem;
+    margin-left: 0;
+    margin-right: 0.75rem;
+    border: none;
+    border-radius: 0.125rem;
+}
+
+.fc-event {
+    box-shadow: none;
+    border-radius: 0.375rem;
+}
+
+.fc-daygrid-event.fc-event-start {
+    margin-left: 0.75rem;
+    border-top-left-radius: 0.375rem;
+    border-bottom-left-radius: 0.375rem;
+}
+
+.fc-daygrid-event.fc-event-end {
+    border-top-right-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+.event-fc-color.fc-bg-success {
+    border: 1px solid var(--success-50);
+    background: var(--success-50);
+}
+
+.event-fc-color.fc-bg-danger {
+    border: 1px solid var(--error-50);
+    background: var(--error-50);
+}
+
+.event-fc-color.fc-bg-primary {
+    border: 1px solid var(--brand-50);
+    background: var(--brand-50);
+}
+
+.event-fc-color.fc-bg-warning {
+    border: 1px solid var(--warning-50);
+    background: var(--warning-50);
+}
+
+.event-fc-color.fc-bg-success .fc-daygrid-event-dot {
+    background: var(--success-500);
+}
+
+.event-fc-color.fc-bg-danger .fc-daygrid-event-dot {
+    background: var(--error-500);
+}
+
+.event-fc-color.fc-bg-primary .fc-daygrid-event-dot {
+    background: var(--brand-500);
+}
+
+.event-fc-color.fc-bg-warning .fc-daygrid-event-dot {
+    background: var(--warning-500);
+}
+
+.fc-direction-ltr .fc-timegrid-slot-label-frame {
+    padding: 0.375rem 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-500);
+}
+
+.dark .fc-direction-ltr .fc-timegrid-slot-label-frame {
+    color: var(--gray-400);
+}
+
+.fc .fc-timegrid-axis-cushion {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-500);
+}
+
+.dark .fc .fc-timegrid-axis-cushion {
+    color: var(--gray-400);
+}
+
+.custom-calendar .fc-h-event {
+    background-color: transparent;
+    border: none;
+    color: black;
+}
+
+/* Ensure calendar events use their assigned colors by default (not just on hover) */
+.custom-calendar .fc-event {
+    /* FullCalendar applies backgroundColor from event data via inline styles */
+    border-radius: 0.375rem;
+}
+
+.custom-calendar .fc-event:hover {
+    opacity: 0.9;
+    filter: brightness(0.95);
+}
+
+/* Override FullCalendar default hover background - keep the assigned color */
+.custom-calendar .fc-daygrid-event:hover,
+.custom-calendar .fc-timegrid-event:hover {
+    /* Keep the original background color on hover, just adjust opacity */
+    opacity: 0.9;
+}
+
+/* Ensure event colors are visible by default - FullCalendar sets these via inline styles */
+.custom-calendar .fc-h-event.fc-event {
+    /* Respect inline backgroundColor and borderColor set by FullCalendar */
+    border-radius: 0.375rem;
+}
+
+/* Override any default transparent backgrounds that might hide the color */
+.custom-calendar .fc-event-main {
+    background-color: inherit;
+    border-radius: 0.375rem;
+}
+
+/* Rounded corners for multi-day events */
+.custom-calendar .fc-daygrid-event.fc-event-start {
+    border-top-left-radius: 0.375rem;
+    border-bottom-left-radius: 0.375rem;
+}
+
+.custom-calendar .fc-daygrid-event.fc-event-end {
+    border-top-right-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+.fc.fc-media-screen {
+    min-height: 100vh;
+}
+
+/* Cursor pointer for clickable elements */
+button,
+a,
+[role="button"],
+[onclick],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select,
+label[for] {
+    cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+    cursor: not-allowed;
+}
+
+/* Loader animation - CSS-based three-bar loader */
+.loader {
+    --c: no-repeat linear-gradient(hsl(var(--primary)) 0 0);
+    background: 
+        var(--c) 0%   50%,
+        var(--c) 50%  50%,
+        var(--c) 100% 50%;
+    animation: l7 1s infinite linear alternate;
+}
+
+@keyframes l7 {
+    0%  {background-size: 20% 50% ,20% 50% ,20% 50% }
+    20% {background-size: 20% 20% ,20% 50% ,20% 50% }
+    40% {background-size: 20% 100%,20% 20% ,20% 50% }
+    60% {background-size: 20% 50% ,20% 100%,20% 20% }
+    80% {background-size: 20% 50% ,20% 50% ,20% 100%}
+    100%{background-size: 20% 50% ,20% 50% ,20% 50% }
+}

@@ -1,0 +1,88 @@
+"use client"
+
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { ThemeToggleButton } from "./ThemeToggleButton"
+import NotificationDropdown from "./NotificationDropdown"
+import UserDropdown from "./UserDropdown"
+import { useSidebarStore } from "@/lib/store"
+import { Button } from "@/components/ui/button"
+
+// Map paths to page titles and descriptions
+const getPageInfo = (pathname: string): { title: string; description: string } => {
+  if (pathname === "/dashboard" || pathname === "/dashboard/") {
+    return { title: "Dashboard", description: "Overview of your organization" }
+  }
+  if (pathname.startsWith("/dashboard/members")) {
+    return { title: "Members", description: "Manage church members, attendance, and groups" }
+  }
+  if (pathname.startsWith("/dashboard/finance")) {
+    return { title: "Finance", description: "Manage church finances, budgets, and accounts" }
+  }
+  if (pathname.startsWith("/dashboard/asset-management")) {
+    return { title: "Asset Management", description: "Manage church assets, disposals, and categories" }
+  }
+  if (pathname.startsWith("/dashboard/events")) {
+    return { title: "Events", description: "Manage church events and activities" }
+  }
+  if (pathname.startsWith("/dashboard/messaging")) {
+    return { title: "Messaging", description: "Send messages and manage communications" }
+  }
+  if (pathname.startsWith("/dashboard/reports")) {
+    return { title: "Reports", description: "View and generate reports" }
+  }
+  if (pathname.startsWith("/dashboard/settings")) {
+    return { title: "Settings", description: "Configure your organization settings" }
+  }
+  return { title: "Dashboard", description: "Overview of your organization" }
+}
+
+export function Header() {
+  const { toggle, isOpen } = useSidebarStore()
+  const pathname = usePathname()
+  const pageInfo = getPageInfo(pathname)
+
+  return (
+    <header className="sticky top-0 flex h-16 w-full items-center bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+      <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
+        <div className="flex items-center justify-between w-full gap-2 px-3 h-16 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggle}
+              className="cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700 rounded-lg p-2"
+            >
+              {isOpen ? (
+                <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-300 stroke-[2.5]" />
+              ) : (
+                <ChevronRight className="h-5 w-5 text-gray-700 dark:text-gray-300 stroke-[2.5]" />
+              )}
+            </Button>
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-xl truncate">
+                {pageInfo.title}
+              </span>
+              <span className="text-xs text-muted-foreground truncate">
+                {pageInfo.description}
+                </span>
+              </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-between w-full gap-4 px-5 h-16 lg:flex lg:justify-end lg:px-0 lg:shadow-none">
+          <div className="flex items-center gap-2 2xsm:gap-3">
+            {/* <!-- Dark Mode Toggler --> */}
+            <ThemeToggleButton />
+            {/* <!-- Dark Mode Toggler --> */}
+
+            <NotificationDropdown />
+            {/* <!-- Notification Menu Area --> */}
+          </div>
+          {/* <!-- User Area --> */}
+          <UserDropdown />
+        </div>
+      </div>
+    </header>
+  )
+}
+
