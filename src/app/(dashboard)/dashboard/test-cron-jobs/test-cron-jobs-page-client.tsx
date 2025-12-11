@@ -12,8 +12,11 @@ interface CronJobResult {
   message?: string
   sent?: number
   errors?: number
+  processed?: number
   date?: string
   eventsProcessed?: number
+  duration_ms?: number
+  status?: string
   error?: string
 }
 
@@ -111,8 +114,11 @@ export function TestCronJobsPageClient() {
           message: result.message,
           sent: result.sent,
           errors: result.errors,
+          processed: result.processed,
           eventsProcessed: result.eventsProcessed,
           date: result.date,
+          duration_ms: result.duration_ms,
+          status: result.status,
         })
         toast.success("Event reminders test completed")
       }
@@ -229,6 +235,12 @@ export function TestCronJobsPageClient() {
                 </CardTitle>
                 <CardDescription>
                   Test the event reminders cron job. This will process events with reminders enabled.
+                  <br />
+                  <span className="text-xs text-amber-600 dark:text-amber-400 mt-1 block">
+                    ⚠️ For testing: If reminder is "day_of", event date must be TODAY. If "day_before", event date must be TOMORROW.
+                    <br />
+                    ℹ️ Note: If a reminder was already sent today for an event, it will be skipped to prevent duplicates. To test again, create a new event or wait until tomorrow.
+                  </span>
                 </CardDescription>
               </div>
             </div>
@@ -269,29 +281,57 @@ export function TestCronJobsPageClient() {
                   <p className="text-sm text-muted-foreground">{eventReminderResult.message}</p>
                 )}
 
+                {eventReminderResult.success && eventReminderResult.sent === 0 && eventReminderResult.processed === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    ℹ️ No reminders were sent. This could mean:
+                    <br />• Reminders were already sent today (check event_reminder_sent_logs table)
+                    <br />• Event dates don't match reminder timing
+                    <br />• No recipients found or invalid recipient IDs
+                  </p>
+                )}
+
                 {eventReminderResult.success && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {eventReminderResult.sent !== undefined && (
-                      <Badge variant="default" className="bg-green-600">
-                        Sent: {eventReminderResult.sent}
-                      </Badge>
-                    )}
-                    {eventReminderResult.errors !== undefined && eventReminderResult.errors > 0 && (
-                      <Badge variant="destructive">
-                        Errors: {eventReminderResult.errors}
-                      </Badge>
-                    )}
-                    {eventReminderResult.eventsProcessed !== undefined && (
-                      <Badge variant="outline">
-                        Events: {eventReminderResult.eventsProcessed}
-                      </Badge>
-                    )}
-                    {eventReminderResult.date && (
-                      <Badge variant="outline">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {eventReminderResult.date}
-                      </Badge>
-                    )}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {eventReminderResult.sent !== undefined && (
+                        <Badge variant="default" className="bg-green-600">
+                          Sent: {eventReminderResult.sent}
+                        </Badge>
+                      )}
+                      {eventReminderResult.processed !== undefined && (
+                        <Badge variant="outline">
+                          Processed: {eventReminderResult.processed}
+                        </Badge>
+                      )}
+                      {eventReminderResult.errors !== undefined && eventReminderResult.errors > 0 && (
+                        <Badge variant="destructive">
+                          Errors: {eventReminderResult.errors}
+                        </Badge>
+                      )}
+                      {eventReminderResult.eventsProcessed !== undefined && (
+                        <Badge variant="outline">
+                          Events: {eventReminderResult.eventsProcessed}
+                        </Badge>
+                      )}
+                      {eventReminderResult.status && (
+                        <Badge variant={eventReminderResult.status === "success" ? "default" : eventReminderResult.status === "partial" ? "secondary" : "destructive"}>
+                          Status: {eventReminderResult.status}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {eventReminderResult.date && (
+                        <Badge variant="outline">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {eventReminderResult.date}
+                        </Badge>
+                      )}
+                      {eventReminderResult.duration_ms !== undefined && (
+                        <Badge variant="outline">
+                          Duration: {eventReminderResult.duration_ms}ms
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -340,7 +380,11 @@ export function TestCronJobsPageClient() {
                   <li>"day_of": sends reminders for events happening today</li>
                 </ul>
               </li>
+              <li>Supports recurring events (Daily, Weekly, Monthly, Yearly)</li>
               <li>Respects recipient type (all_members, groups, selected_members)</li>
+              <li>Includes both active and inactive members for "all_members"</li>
+              <li>Uses event template or custom message if configured</li>
+              <li>Prevents duplicate reminders using sent logs</li>
             </ul>
           </div>
 

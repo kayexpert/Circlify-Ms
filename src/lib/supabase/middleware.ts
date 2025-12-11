@@ -71,7 +71,7 @@ export async function updateSession(request: NextRequest) {
     try {
       const { count } = await supabase
         .from('organization_users')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .limit(1)
       

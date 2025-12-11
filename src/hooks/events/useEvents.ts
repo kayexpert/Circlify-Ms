@@ -40,6 +40,8 @@ export function useEvents() {
           reminder_send_time,
           reminder_recipient_type,
           reminder_recipient_ids,
+          reminder_template_id,
+          reminder_message_text,
           color,
           created_at,
           event_types (

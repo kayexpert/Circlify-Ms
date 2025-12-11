@@ -29,7 +29,7 @@ export function useReconciliationRecords() {
 
       const { data, error } = await supabase
         .from("finance_reconciliation_records")
-        .select("*")
+        .select("id, organization_id, account_id, date, account_name, book_balance, bank_balance, difference, status, reconciled_income_entries, reconciled_expenditure_entries, added_income_entries, added_expenditure_entries, notes, created_at, updated_at")
         .eq("organization_id", organization.id)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
@@ -65,14 +65,14 @@ export function useReconciliationRecordsPaginated(page: number = 1, pageSize: nu
       const [dataResult, countResult] = await Promise.all([
         supabase
           .from("finance_reconciliation_records")
-          .select("*")
+          .select("id, organization_id, account_id, date, account_name, book_balance, bank_balance, difference, status, reconciled_income_entries, reconciled_expenditure_entries, added_income_entries, added_expenditure_entries, notes, created_at, updated_at")
           .eq("organization_id", organization.id)
           .order("date", { ascending: false })
           .order("created_at", { ascending: false })
           .range(from, to),
         supabase
           .from("finance_reconciliation_records")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("organization_id", organization.id)
       ])
 
@@ -111,7 +111,7 @@ export function useReconciliationByAccount(accountId: string | null) {
 
       const { data, error } = await supabase
         .from("finance_reconciliation_records")
-        .select("*")
+        .select("id, organization_id, account_id, date, account_name, book_balance, bank_balance, difference, status, reconciled_income_entries, reconciled_expenditure_entries, added_income_entries, added_expenditure_entries, notes, created_at, updated_at")
         .eq("organization_id", organization.id)
         .eq("account_id", accountId)
         .order("date", { ascending: false })
@@ -204,10 +204,16 @@ export function useCreateReconciliation() {
 
       return convertReconciliation(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate all related queries (both main and paginated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+      ])
       toast.success("Reconciliation record created successfully")
     },
     onError: (error: Error) => {
@@ -351,10 +357,16 @@ export function useUpdateReconciliation() {
 
       return convertReconciliation(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate all related queries (both main and paginated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+      ])
       toast.success("Reconciliation record updated successfully")
     },
     onError: (error: Error) => {
@@ -420,10 +432,16 @@ export function useDeleteReconciliation() {
         throw error
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate all related queries (both main and paginated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_reconciliation_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+      ])
       toast.success("Reconciliation record deleted successfully")
     },
     onError: (error: Error) => {

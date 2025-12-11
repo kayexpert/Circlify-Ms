@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get API configuration
+    // Get API configuration - only select needed fields
     const { data: apiConfig, error: apiConfigError } = await supabase
       .from("messaging_api_configurations")
-      .select("*")
+      .select("id, name, api_key, username, sender_id, is_active, organization_id")
       .eq("id", apiConfigId)
       .eq("organization_id", (session as any).organization_id)
       .single()

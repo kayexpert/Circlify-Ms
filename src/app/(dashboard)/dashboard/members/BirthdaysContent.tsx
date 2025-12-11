@@ -1,29 +1,47 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { Cake, Send, Calendar, Users } from "lucide-react"
+import { Cake, Send, Calendar, Users, Settings, AlertCircle } from "lucide-react"
 import { Spinner, CompactLoader } from "@/components/ui/loader"
 import Image from "next/image"
+import { toast } from "sonner"
 import { formatDate } from "./utils"
 import { useMembers } from "@/hooks/members"
+import { 
+  useActiveAPIConfiguration, 
+  useSendMessage, 
+  useNotificationSettings,
+  useMessagingTemplate
+} from "@/hooks/messaging"
+import { personalizeMessage, formatPhoneNumber } from "@/app/(dashboard)/dashboard/messaging/utils"
 import type { Birthday } from "./types"
 
 export default function BirthdaysContent() {
+  const router = useRouter()
   const [days] = useState(30)
   const [isSendSheetOpen, setIsSendSheetOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Birthday | null>(null)
   const [customMessage, setCustomMessage] = useState("")
+  const [isSending, setIsSending] = useState(false)
 
   // Fetch data using hooks
   const { data: allMembers = [], isLoading: membersLoading } = useMembers()
+  const { data: activeApiConfig, isLoading: apiConfigLoading } = useActiveAPIConfiguration()
+  const { data: notificationSettings } = useNotificationSettings()
+  const sendMessage = useSendMessage()
+  
+  // Get birthday template if configured
+  const birthdayTemplateId = notificationSettings?.birthdayTemplateId
+  const { data: birthdayTemplate } = useMessagingTemplate(birthdayTemplateId || null)
 
-  const isLoading = membersLoading
+  const isLoading = membersLoading || apiConfigLoading
 
   // Calculate today's birthdays
   const todaysBirthdays = useMemo(() => {
@@ -128,14 +146,114 @@ export default function BirthdaysContent() {
   const handleSendWish = (member: Birthday) => {
     setSelectedMember(member)
     setIsSendSheetOpen(true)
+    setCustomMessage("")
   }
 
-  const handleSubmitWish = () => {
-    if (selectedMember) {
-      console.log("Sending birthday wish to:", selectedMember, "Message:", customMessage)
+  const handleSubmitWish = async () => {
+    if (!selectedMember) return
+
+    // Check if API is configured
+    if (!activeApiConfig) {
+      toast.error("Messaging API not configured. Please configure your messaging API settings first.")
+      setIsSendSheetOpen(false)
+      return
+    }
+
+    // Get full member data including phone number
+    const fullMember = allMembers.find((m: any) => m.id === selectedMember.id)
+    if (!fullMember) {
+      toast.error("Member not found")
+      return
+    }
+
+    // Check if member has a phone number
+    if (!fullMember.phone_number) {
+      toast.error("Member does not have a phone number. Please add a phone number to send birthday wishes.")
+      return
+    }
+
+    setIsSending(true)
+
+    try {
+      // Determine message to send
+      let messageToSend = customMessage.trim()
+      
+      // If no custom message, use template or default
+      if (!messageToSend) {
+        if (birthdayTemplate?.message) {
+          messageToSend = birthdayTemplate.message
+        } else {
+          // Default birthday message
+          messageToSend = `Happy Birthday {FirstName}! Wishing you a blessed day filled with joy and happiness. God bless you!`
+        }
+      }
+
+      // Personalize the message
+      const personalizedMessage = personalizeMessage(messageToSend, {
+        FirstName: fullMember.first_name || "",
+        LastName: fullMember.last_name || "",
+        PhoneNumber: formatPhoneNumber(fullMember.phone_number),
+        // FullName is automatically generated from FirstName and LastName in personalizeMessage
+      })
+
+      // Validate message length
+      if (personalizedMessage.length > 160) {
+        toast.error("Message exceeds 160 character limit. Please shorten your message.")
+        setIsSending(false)
+        return
+      }
+
+      // Send the message
+      await sendMessage.mutateAsync({
+        messageName: `Birthday Wish - ${fullMember.first_name} ${fullMember.last_name}`,
+        message: personalizedMessage,
+        recipients: [{
+          phone: fullMember.phone_number,
+          name: `${fullMember.first_name} ${fullMember.last_name}`,
+          memberId: fullMember.id.toString(),
+        }],
+        apiConfigId: activeApiConfig.id,
+        templateId: birthdayTemplateId || undefined,
+      })
+
+      // Success - close sheet and reset
       setIsSendSheetOpen(false)
       setCustomMessage("")
       setSelectedMember(null)
+      // Success toast is handled by the useSendMessage hook
+    } catch (error) {
+      console.error("Error sending birthday wish:", error)
+      // Error is already handled by the mutation's onError
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  // Reset custom message when template changes
+  useEffect(() => {
+    if (birthdayTemplate && !customMessage && selectedMember) {
+      // Optionally pre-fill with template message
+      // setCustomMessage(birthdayTemplate.message)
+    }
+  }, [birthdayTemplate, selectedMember])
+
+  // Helper function to insert placeholder at cursor position
+  const insertPlaceholder = (placeholder: string) => {
+    const textarea = document.getElementById("birthday-message-textarea") as HTMLTextAreaElement
+    if (textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const text = customMessage
+      const before = text.substring(0, start)
+      const after = text.substring(end)
+      setCustomMessage(before + placeholder + after)
+      // Set cursor position after inserted placeholder
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + placeholder.length, start + placeholder.length)
+      }, 0)
+    } else {
+      setCustomMessage(customMessage + placeholder)
     }
   }
 
@@ -294,34 +412,146 @@ export default function BirthdaysContent() {
           </SheetHeader>
           {selectedMember && (
             <div className="mt-6 space-y-4">
+              {/* API Configuration Warning */}
+              {!activeApiConfig && (
+                <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-yellow-900 dark:text-yellow-100">
+                        Messaging API Not Configured
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                        Please configure your messaging API settings before sending birthday wishes.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => {
+                          setIsSendSheetOpen(false)
+                          router.push("/dashboard/messaging?tab=configuration")
+                        }}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Go to Configuration
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Member Info */}
               <div className="p-4 rounded-lg bg-muted">
                 <p className="font-medium">{selectedMember.first_name} {selectedMember.last_name}</p>
                 <p className="text-sm text-muted-foreground">
                   Turning {selectedMember.age} on {formatDate(selectedMember.birthday_date)}
                 </p>
+                {(() => {
+                  const fullMember = allMembers.find((m: any) => m.id === selectedMember.id)
+                  if (!fullMember?.phone_number) {
+                    return (
+                      <p className="text-sm text-destructive mt-2">
+                        ⚠️ No phone number available for this member
+                      </p>
+                    )
+                  }
+                  return null
+                })()}
               </div>
 
+              {/* Message Input */}
               <div className="space-y-2">
                 <Label>Custom Message (Optional)</Label>
                 <Textarea
+                  id="birthday-message-textarea"
                   value={customMessage}
                   onChange={(e) => setCustomMessage(e.target.value)}
-                  placeholder="Leave empty to use default birthday message..."
+                  placeholder={
+                    birthdayTemplate?.message 
+                      ? "Leave empty to use configured birthday template..." 
+                      : "Leave empty to use default birthday message..."
+                  }
                   rows={4}
+                  maxLength={160}
+                  disabled={isSending || !activeApiConfig}
                 />
-                <p className="text-xs text-muted-foreground">
-                  If empty, the default birthday message will be sent via SMS and Email
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {customMessage.length > 0 
+                      ? `${customMessage.length}/160 characters`
+                      : birthdayTemplate?.message
+                        ? "If empty, the configured birthday template will be used"
+                        : "If empty, the default birthday message will be sent via SMS"
+                    }
+                  </p>
+                </div>
               </div>
 
+              {/* Placeholders Info Box */}
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <p className="text-sm font-semibold">Available Placeholders:</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder("{FirstName}")}
+                    disabled={isSending || !activeApiConfig}
+                    className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {"{FirstName}"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder("{LastName}")}
+                    disabled={isSending || !activeApiConfig}
+                    className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {"{LastName}"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder("{FullName}")}
+                    disabled={isSending || !activeApiConfig}
+                    className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {"{FullName}"}
+                  </button>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                  <p>• {"{FirstName}"} - Member's first name</p>
+                  <p>• {"{LastName}"} - Member's last name</p>
+                  <p>• {"{FullName}"} - Member's full name</p>
+                  <p className="text-muted-foreground/70 italic">Click a placeholder above to insert it into your message</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button
                   onClick={handleSubmitWish}
                   className="flex-1"
+                  disabled={isSending || !activeApiConfig || !allMembers.find((m: any) => m.id === selectedMember.id)?.phone_number}
                 >
-                  Send Birthday Wish
+                  {isSending ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Birthday Wish
+                    </>
+                  )}
                 </Button>
-                <Button variant="outline" onClick={() => setIsSendSheetOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsSendSheetOpen(false)
+                    setCustomMessage("")
+                  }}
+                  disabled={isSending}
+                >
                   Cancel
                 </Button>
               </div>
@@ -333,4 +563,5 @@ export default function BirthdaysContent() {
     </div>
   )
 }
+
 

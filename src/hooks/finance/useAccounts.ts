@@ -277,7 +277,7 @@ export function useAccount(accountId: string | null) {
 
       const { data, error } = await supabase
         .from("finance_accounts")
-        .select("*")
+        .select("id, name, account_type, balance, opening_balance, description, bank_name, bank_branch, bank_account_type, account_number, network, number, created_at, updated_at")
         .eq("id", accountId)
         .eq("organization_id", organization.id)
         .single()

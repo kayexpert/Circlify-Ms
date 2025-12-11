@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
         const { data: userData } = await supabase
           .from("users")
-          .select("*")
+          .select("id, email, full_name, avatar_url, created_at, updated_at")
           .eq("id", authUser.id)
           .single();
         
@@ -64,9 +64,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden bg-background">
+      <div className="flex flex-1 flex-col overflow-hidden bg-background min-w-0">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-background p-6">
+        <main className="flex-1 overflow-y-auto bg-background p-6 min-h-0 overscroll-contain">
           {children}
         </main>
       </div>

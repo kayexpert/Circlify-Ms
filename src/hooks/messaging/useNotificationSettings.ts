@@ -60,8 +60,6 @@ export function useNotificationSettings() {
           birthdayTemplateId: newDataTyped.birthday_template_id || undefined,
           contributionNotificationsEnabled: newDataTyped.contribution_notifications_enabled,
           contributionTemplateId: newDataTyped.contribution_template_id || undefined,
-          eventNotificationsEnabled: false,
-          eventTemplateId: undefined,
         } as NotificationSettings
       }
 
@@ -71,8 +69,6 @@ export function useNotificationSettings() {
         birthdayTemplateId: dataTyped.birthday_template_id || undefined,
         contributionNotificationsEnabled: dataTyped.contribution_notifications_enabled,
         contributionTemplateId: dataTyped.contribution_template_id || undefined,
-        eventNotificationsEnabled: false,
-        eventTemplateId: undefined,
       } as NotificationSettings
     },
     enabled: !!organization?.id && !orgLoading,
@@ -93,7 +89,7 @@ export function useUpdateNotificationSettings() {
     mutationFn: async (settings: Partial<NotificationSettings>) => {
       if (!organization?.id) throw new Error("No organization selected")
 
-      const updatePayload: MessagingNotificationSettingsUpdate & { event_notifications_enabled?: boolean; event_template_id?: string | null } = {}
+      const updatePayload: MessagingNotificationSettingsUpdate = {}
       if (settings.birthdayMessagesEnabled !== undefined)
         updatePayload.birthday_messages_enabled = settings.birthdayMessagesEnabled
       if (settings.birthdayTemplateId !== undefined)
@@ -102,10 +98,6 @@ export function useUpdateNotificationSettings() {
         updatePayload.contribution_notifications_enabled = settings.contributionNotificationsEnabled
       if (settings.contributionTemplateId !== undefined)
         updatePayload.contribution_template_id = settings.contributionTemplateId || null
-      if (settings.eventNotificationsEnabled !== undefined)
-        updatePayload.event_notifications_enabled = settings.eventNotificationsEnabled
-      if (settings.eventTemplateId !== undefined)
-        updatePayload.event_template_id = settings.eventTemplateId || null
 
       // Check if settings exist
       const { data: existing } = await (supabase
@@ -132,14 +124,12 @@ export function useUpdateNotificationSettings() {
         result = data
       } else {
         // Create new
-        const insertPayload: MessagingNotificationSettingsInsert & { event_notifications_enabled?: boolean; event_template_id?: string | null } = {
+        const insertPayload: MessagingNotificationSettingsInsert = {
           organization_id: organization.id,
           birthday_messages_enabled: settings.birthdayMessagesEnabled || false,
           birthday_template_id: settings.birthdayTemplateId || null,
           contribution_notifications_enabled: settings.contributionNotificationsEnabled || false,
           contribution_template_id: settings.contributionTemplateId || null,
-          event_notifications_enabled: settings.eventNotificationsEnabled || false,
-          event_template_id: settings.eventTemplateId || null,
         }
 
         const { data, error } = await (supabase
@@ -160,8 +150,6 @@ export function useUpdateNotificationSettings() {
         birthdayTemplateId: result.birthday_template_id || undefined,
         contributionNotificationsEnabled: result.contribution_notifications_enabled,
         contributionTemplateId: result.contribution_template_id || undefined,
-        eventNotificationsEnabled: (result as any).event_notifications_enabled || false,
-        eventTemplateId: (result as any).event_template_id || undefined,
       } as NotificationSettings
     },
     onSuccess: () => {

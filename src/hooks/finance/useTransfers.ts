@@ -22,7 +22,7 @@ export function useTransfers() {
 
       const { data, error } = await supabase
         .from("finance_transfers")
-        .select("*")
+        .select("id, organization_id, date, from_account_id, from_account_name, to_account_id, to_account_name, amount, description, created_at, updated_at")
         .eq("organization_id", organization.id)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
@@ -140,7 +140,7 @@ export function useDeleteTransfer() {
       // Get transfer details first
       const { data: transfer, error: fetchError } = await (supabase
         .from("finance_transfers") as any)
-        .select("*")
+        .select("id, organization_id, date, from_account_id, from_account_name, to_account_id, to_account_name, amount, description")
         .eq("id", transferId)
         .eq("organization_id", organization.id)
         .single()

@@ -185,8 +185,12 @@ export function useCreateVisitor() {
 
       return convertVisitor(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["visitors", "paginated", organization?.id] }),
+      ])
       toast.success("Visitor created successfully")
     },
     onError: (error: Error) => {
@@ -252,8 +256,12 @@ export function useUpdateVisitor() {
 
       return convertVisitor(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["visitors", "paginated", organization?.id] }),
+      ])
       toast.success("Visitor updated successfully")
     },
     onError: (error: Error) => {
@@ -286,8 +294,12 @@ export function useDeleteVisitor() {
         throw error
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["visitors", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["visitors", "paginated", organization?.id] }),
+      ])
       toast.success("Visitor deleted successfully")
     },
     onError: (error: Error) => {

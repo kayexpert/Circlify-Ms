@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${outfit.variable} h-full`}>
+    <html lang="en" suppressHydrationWarning className={`${outfit.variable} h-full overflow-hidden`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -58,7 +58,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${outfit.variable} font-sans antialiased h-full bg-background text-foreground`}>
+      <body className={`${outfit.variable} font-sans antialiased h-full overflow-hidden bg-background text-foreground`}>
         <ThemeProvider>
           <ReactQueryProvider>
             {children}

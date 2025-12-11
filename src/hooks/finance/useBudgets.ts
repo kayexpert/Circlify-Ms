@@ -22,7 +22,7 @@ export function useBudgets() {
 
       const { data, error } = await supabase
         .from("finance_budgets")
-        .select("*")
+        .select("id, organization_id, category, budgeted, spent, period, created_at, updated_at")
         .eq("organization_id", organization.id)
         .order("period", { ascending: false })
         .order("category", { ascending: true })
@@ -53,7 +53,7 @@ export function useBudgetsByPeriod(period: string) {
 
       const { data, error } = await supabase
         .from("finance_budgets")
-        .select("*")
+        .select("id, organization_id, category, budgeted, spent, period, created_at, updated_at")
         .eq("organization_id", organization.id)
         .eq("period", period)
         .order("category", { ascending: true })

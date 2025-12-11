@@ -72,7 +72,7 @@ export default function AccountsContent() {
     if (!organization?.id) return null
     const { data, error } = await supabase
       .from("finance_accounts")
-      .select("*")
+      .select("id, name, account_type, balance, opening_balance, description, bank_name, bank_branch, bank_account_type, account_number, network, number, organization_id")
       .eq("organization_id", organization.id)
       .eq("name", accountName)
       .maybeSingle()
@@ -1041,7 +1041,7 @@ function TransferTab() {
     
     const { data, error } = await supabase
       .from("finance_accounts")
-      .select("*")
+      .select("id, name, account_type, balance, opening_balance, description, bank_name, bank_branch, bank_account_type, account_number, network, number, organization_id")
       .eq("organization_id", organization.id)
       .eq("name", account.name)
       .maybeSingle()

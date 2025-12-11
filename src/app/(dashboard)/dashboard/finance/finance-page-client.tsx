@@ -1,18 +1,20 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, lazy, Suspense } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
-import { useIncomeRecords } from "@/hooks/useIncomeRecords"
-import OverviewContent from "./OverviewContent"
-import IncomeContent from "./IncomeContent"
-import ExpenditureContent from "./ExpenditureContent"
-import AccountsContent from "./AccountsContent"
-import ReconciliationContent from "./ReconciliationContent"
-import LiabilitiesContent from "./LiabilitiesContent"
-import CategoriesContent from "./CategoriesContent"
-import FinanceFormSheet from "./FinanceFormSheet"
+import { CompactLoader } from "@/components/ui/loader"
+
+// Lazy load tab components - only load when needed
+const OverviewContent = lazy(() => import("./OverviewContent").then(m => ({ default: m.default })))
+const IncomeContent = lazy(() => import("./IncomeContent").then(m => ({ default: m.default })))
+const ExpenditureContent = lazy(() => import("./ExpenditureContent").then(m => ({ default: m.default })))
+const AccountsContent = lazy(() => import("./AccountsContent").then(m => ({ default: m.default })))
+const ReconciliationContent = lazy(() => import("./ReconciliationContent").then(m => ({ default: m.default })))
+const LiabilitiesContent = lazy(() => import("./LiabilitiesContent").then(m => ({ default: m.default })))
+const CategoriesContent = lazy(() => import("./CategoriesContent").then(m => ({ default: m.default })))
+const FinanceFormSheet = lazy(() => import("./FinanceFormSheet").then(m => ({ default: m.default })))
 
 // Dummy data
 const dummyIncomeRecords = [
@@ -105,19 +107,9 @@ export function FinancePageClient() {
   const [sheetType, setSheetType] = useState<"income" | "expenditure" | "account" | "liability">("income")
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
 
-  // Use shared income records hook
-  const { incomeRecords, setIncomeRecords } = useIncomeRecords()
-
-  // Initialize with dummy data if empty (only on first mount)
-  useEffect(() => {
-    if (incomeRecords.length === 0 && typeof window !== "undefined") {
-      const stored = localStorage.getItem("incomeRecords")
-      if (!stored) {
-        setIncomeRecords(dummyIncomeRecords)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Note: Income records are now managed by IncomeContent component using database hooks
+  // This file uses dummy data for legacy compatibility
+  const [incomeRecords, setIncomeRecords] = useState(dummyIncomeRecords)
   const [expenditureRecords, setExpenditureRecords] = useState(dummyExpenditureRecords)
   const [accounts, setAccounts] = useState(dummyAccounts)
   const [liabilities, setLiabilities] = useState(dummyLiabilities)
@@ -366,50 +358,68 @@ export function FinancePageClient() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
-          <OverviewContent />
+          <Suspense fallback={<CompactLoader />}>
+            <OverviewContent />
+          </Suspense>
         </TabsContent>
 
         {/* Income Tab */}
         <TabsContent value="income" className="space-y-4">
-          <IncomeContent />
+          <Suspense fallback={<CompactLoader />}>
+            <IncomeContent />
+          </Suspense>
         </TabsContent>
 
         {/* Expenditure Tab */}
         <TabsContent value="expenditure" className="space-y-4">
-          <ExpenditureContent />
+          <Suspense fallback={<CompactLoader />}>
+            <ExpenditureContent />
+          </Suspense>
         </TabsContent>
 
         {/* Liabilities Tab */}
         <TabsContent value="liabilities" className="space-y-4">
-          <LiabilitiesContent />
+          <Suspense fallback={<CompactLoader />}>
+            <LiabilitiesContent />
+          </Suspense>
         </TabsContent>
 
         {/* Accounts Tab */}
         <TabsContent value="accounts" className="space-y-4">
-          <AccountsContent />
+          <Suspense fallback={<CompactLoader />}>
+            <AccountsContent />
+          </Suspense>
         </TabsContent>
 
         {/* Reconciliation Tab */}
         <TabsContent value="reconciliation" className="space-y-4">
-          <ReconciliationContent />
+          <Suspense fallback={<CompactLoader />}>
+            <ReconciliationContent />
+          </Suspense>
         </TabsContent>
 
         {/* Categories Tab */}
         <TabsContent value="categories" className="space-y-4">
-          <CategoriesContent />
+          <Suspense fallback={<CompactLoader />}>
+            <CategoriesContent />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
       {/* Finance Forms Sheet */}
-      <FinanceFormSheet
-        isOpen={isSheetOpen}
-        onOpenChange={setIsSheetOpen}
-        sheetType={sheetType}
-        formData={formData}
-        setFormData={setFormData}
-        selectedRecord={selectedRecord}
-        onSubmit={handleSubmit}
-      />
+      {isSheetOpen && (
+        <Suspense fallback={null}>
+          <FinanceFormSheet
+            isOpen={isSheetOpen}
+            onOpenChange={setIsSheetOpen}
+            sheetType={sheetType}
+            formData={formData}
+            setFormData={setFormData}
+            selectedRecord={selectedRecord}
+            onSubmit={handleSubmit}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

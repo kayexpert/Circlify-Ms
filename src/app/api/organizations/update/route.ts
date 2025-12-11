@@ -114,7 +114,7 @@ export async function PATCH(request: NextRequest) {
       // Fetch the organization using admin client to verify it exists
       const { data: fetchedOrg, error: fetchError } = await supabaseAdmin
         .from("organizations")
-        .select("*")
+        .select("id, name, email, phone, location, country, website, logo_url, currency, type, size, description, created_at, updated_at")
         .eq("id", organizationId)
         .maybeSingle()
 

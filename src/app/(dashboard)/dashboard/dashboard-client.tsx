@@ -1,15 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserPlus, DollarSign, Calendar, TrendingUp, TrendingDown, Cake, ArrowRight } from "lucide-react"
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import type { ComponentType } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@/types/database"
+import { CompactLoader } from "@/components/ui/loader"
+import { useMemberStatistics, useUpcomingBirthdays, useRecentMembers, useMemberGrowthData } from "@/hooks/members/useMemberStatistics"
+import { useFinanceOverview, useFinanceMonthlyTrends } from "@/hooks/finance/useFinanceStatistics"
+import { useEvents } from "@/hooks/events"
+import { useVisitorsPaginated } from "@/hooks/members/useVisitors"
+import { format } from "date-fns"
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 type ChangeType = "increase" | "decrease" | "neutral"
 type Stat = {
@@ -21,78 +27,21 @@ type Stat = {
   description: string
 }
 
-// Sample data - replace with real API calls
-const memberGrowthData = [
-  { month: "Jan", members: 450, visitors: 45 },
-  { month: "Feb", members: 465, visitors: 52 },
-  { month: "Mar", members: 480, visitors: 48 },
-  { month: "Apr", members: 495, visitors: 61 },
-  { month: "May", members: 512, visitors: 55 },
-  { month: "Jun", members: 530, visitors: 67 },
-]
-
-const donationData = [
-  { month: "Jan", amount: 45000 },
-  { month: "Feb", amount: 52000 },
-  { month: "Mar", amount: 48000 },
-  { month: "Apr", amount: 61000 },
-  { month: "May", amount: 55000 },
-  { month: "Jun", amount: 67000 },
-]
-
-const attendanceData = [
-  { name: "Sunday Service", value: 450 },
-  { name: "Midweek Service", value: 180 },
-  { name: "Prayer Meeting", value: 120 },
-  { name: "Bible Study", value: 95 },
-]
-
 const COLORS = ["#8b5cf6", "#6366f1", "#3b82f6", "#0ea5e9"]
-
-// Today's birthdays
-const todayBirthdays = [
-  { id: 1, name: "Kwame Mensah", role: "Pastor", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400" },
-  { id: 2, name: "Ama Asante", role: "Elder", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400" },
-]
-
-const stats: Stat[] = [
-  {
-    title: "Total Members",
-    value: "530",
-    change: "+18",
-    changeType: "increase" as const,
-    icon: Users,
-    description: "from last month",
-  },
-  {
-    title: "New Visitors",
-    value: "67",
-    change: "+12",
-    changeType: "increase" as const,
-    icon: UserPlus,
-    description: "this month",
-  },
-  {
-    title: "Total Donations",
-    value: "GH₵ 67,000",
-    change: "+21.8%",
-    changeType: "increase" as const,
-    icon: DollarSign,
-    description: "from last month",
-  },
-  {
-    title: "Upcoming Events",
-    value: "8",
-    change: "2",
-    changeType: "neutral" as const,
-    icon: Calendar,
-    description: "this week",
-  },
-]
 
 export function DashboardPageClient() {
   const [user, setUser] = useState<User | null>(null)
   const supabase = createClient()
+
+  // Fetch real data using optimized hooks
+  const { data: memberStats, isLoading: memberStatsLoading } = useMemberStatistics()
+  const { data: todayBirthdays = [], isLoading: birthdaysLoading } = useUpcomingBirthdays(1) // Today only
+  const { data: recentMembers = [], isLoading: recentMembersLoading } = useRecentMembers(4)
+  const { data: financeOverview, isLoading: financeLoading } = useFinanceOverview()
+  const { data: financeTrends = [], isLoading: trendsLoading } = useFinanceMonthlyTrends(6)
+  const { data: events = [], isLoading: eventsLoading } = useEvents()
+  const { data: visitorsData, isLoading: visitorsLoading } = useVisitorsPaginated(1, 100) // Get recent visitors
+  const { data: growthData = [], isLoading: growthLoading } = useMemberGrowthData("all")
 
   useEffect(() => {
     async function loadUser() {
@@ -103,7 +52,7 @@ export function DashboardPageClient() {
       if (authUser) {
         const { data: userData } = await supabase
           .from('users')
-          .select('*')
+          .select('id, email, full_name, avatar_url, created_at')
           .eq('id', authUser.id)
           .single()
         
@@ -117,6 +66,100 @@ export function DashboardPageClient() {
   }, [supabase])
 
   const userName = user?.full_name || user?.email?.split('@')[0] || "there"
+
+  // Memoize stats calculation
+  const stats = useMemo((): Stat[] => {
+    const totalMembers = memberStats?.totalMembers || 0
+    const recentVisitors = visitorsData?.data?.length || 0
+    const totalIncome = financeOverview?.totalIncome || 0
+    const upcomingEventsCount = events.filter(e => {
+      const eventDate = new Date(e.event_date)
+      const weekFromNow = new Date()
+      weekFromNow.setDate(weekFromNow.getDate() + 7)
+      return eventDate >= new Date() && eventDate <= weekFromNow
+    }).length
+
+    return [
+      {
+        title: "Total Members",
+        value: totalMembers.toString(),
+        change: "+0",
+        changeType: "neutral" as const,
+        icon: Users,
+        description: "active members",
+      },
+      {
+        title: "Recent Visitors",
+        value: recentVisitors.toString(),
+        change: "+0",
+        changeType: "neutral" as const,
+        icon: UserPlus,
+        description: "recent visitors",
+      },
+      {
+        title: "Total Income",
+        value: `GH₵ ${totalIncome.toLocaleString()}`,
+        change: "+0%",
+        changeType: "neutral" as const,
+        icon: DollarSign,
+        description: "total income",
+      },
+      {
+        title: "Upcoming Events",
+        value: upcomingEventsCount.toString(),
+        change: "0",
+        changeType: "neutral" as const,
+        icon: Calendar,
+        description: "this week",
+      },
+    ]
+  }, [memberStats, visitorsData, financeOverview, events])
+
+  // Memoize chart data
+  const memberGrowthData = useMemo(() => {
+    return growthData.slice(-6).map((item, index) => ({
+      month: item.period,
+      members: item.members,
+      active: item.active,
+    }))
+  }, [growthData])
+
+  const donationData = useMemo(() => {
+    return financeTrends.slice(-6).map(item => ({
+      month: item.period,
+      amount: item.income,
+    }))
+  }, [financeTrends])
+
+  // Get upcoming events for display
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(e => {
+        const eventDate = new Date(e.event_date)
+        return eventDate >= new Date()
+      })
+      .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+      .slice(0, 4)
+      .map(e => ({
+        name: e.name,
+        date: format(new Date(e.event_date), "EEE, MMM d, h:mm a"),
+      }))
+  }, [events])
+
+  const isLoading = memberStatsLoading || birthdaysLoading || recentMembersLoading || 
+                    financeLoading || trendsLoading || eventsLoading || visitorsLoading || growthLoading
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, {userName}!</p>
+        </div>
+        <CompactLoader />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -175,12 +218,18 @@ export function DashboardPageClient() {
             <div className="grid gap-3 md:grid-cols-2">
               {todayBirthdays.map((person) => (
                 <div key={person.id} className="flex items-center gap-3 p-3 bg-white dark:bg-background rounded-lg border-2 border-pink-200 dark:border-pink-800">
-                  <div className="relative h-12 w-12 rounded-full overflow-hidden flex-shrink-0">
-                    <Image src={person.photo} alt={person.name} fill className="object-cover" />
+                  <div className="relative h-12 w-12 rounded-full overflow-hidden flex-shrink-0 bg-primary/10 flex items-center justify-center">
+                    {person.photo ? (
+                      <Image src={person.photo} alt={`${person.first_name} ${person.last_name}`} fill className="object-cover" />
+                    ) : (
+                      <span className="text-sm font-medium">
+                        {person.first_name[0]}{person.last_name[0]}
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <p className="font-semibold">{person.name}</p>
-                    <p className="text-sm text-muted-foreground">{person.role}</p>
+                    <p className="font-semibold">{person.first_name} {person.last_name}</p>
+                    <p className="text-sm text-muted-foreground">Age {person.age}</p>
                   </div>
                 </div>
               ))}
@@ -200,21 +249,27 @@ export function DashboardPageClient() {
         <TabsContent value="members" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Member & Visitor Growth</CardTitle>
-              <CardDescription>Monthly member and visitor statistics</CardDescription>
+              <CardTitle>Member Growth</CardTitle>
+              <CardDescription>Monthly member statistics</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={memberGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="members" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" />
-                  <Area type="monotone" dataKey="visitors" stackId="1" stroke="#6366f1" fill="#6366f1" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {memberGrowthData.length > 0 ? (
+                <Suspense fallback={<CompactLoader />}>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <AreaChart data={memberGrowthData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Area type="monotone" dataKey="members" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" />
+                      <Area type="monotone" dataKey="active" stackId="1" stroke="#6366f1" fill="#6366f1" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </Suspense>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No growth data available</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -222,20 +277,26 @@ export function DashboardPageClient() {
         <TabsContent value="donations" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Donation Trends</CardTitle>
-              <CardDescription>Monthly donation amounts</CardDescription>
+              <CardTitle>Income Trends</CardTitle>
+              <CardDescription>Monthly income amounts</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={donationData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="amount" fill="#8b5cf6" />
-                </BarChart>
-              </ResponsiveContainer>
+              {donationData.length > 0 ? (
+                <Suspense fallback={<CompactLoader />}>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={donationData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="amount" fill="#8b5cf6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Suspense>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No income data available</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -243,29 +304,35 @@ export function DashboardPageClient() {
         <TabsContent value="attendance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Service Attendance</CardTitle>
-              <CardDescription>Average attendance by service type</CardDescription>
+              <CardTitle>Member Distribution</CardTitle>
+              <CardDescription>Active vs Inactive members</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={attendanceData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent = 0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {attendanceData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {memberStats && (
+                <Suspense fallback={<CompactLoader />}>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Active", value: memberStats.activeMembers },
+                          { name: "Inactive", value: memberStats.inactiveMembers },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent = 0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={120}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        <Cell fill={COLORS[0]} />
+                        <Cell fill={COLORS[1]} />
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Suspense>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -280,18 +347,23 @@ export function DashboardPageClient() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-medium">
-                    JD
+              {recentMembers.length > 0 ? (
+                recentMembers.map((member) => (
+                  <div key={member.id} className="flex items-center gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-medium">
+                      {member.first_name[0]}{member.last_name[0]}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium leading-none">{member.first_name} {member.last_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Joined {format(new Date(member.join_date), "MMM d, yyyy")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">John Doe</p>
-                    <p className="text-sm text-muted-foreground">john.doe@example.com</p>
-                  </div>
-                  <div className="text-sm text-muted-foreground">2 days ago</div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No recent members</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -303,20 +375,19 @@ export function DashboardPageClient() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { name: "Sunday Service", date: "Tomorrow, 9:00 AM" },
-                { name: "Bible Study", date: "Wed, 6:00 PM" },
-                { name: "Youth Meeting", date: "Fri, 5:00 PM" },
-                { name: "Prayer Meeting", date: "Sat, 7:00 AM" },
-              ].map((event, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{event.name}</p>
-                    <p className="text-sm text-muted-foreground">{event.date}</p>
+              {upcomingEvents.length > 0 ? (
+                upcomingEvents.map((event, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">{event.name}</p>
+                      <p className="text-sm text-muted-foreground">{event.date}</p>
+                    </div>
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No upcoming events</p>
+              )}
             </div>
           </CardContent>
         </Card>

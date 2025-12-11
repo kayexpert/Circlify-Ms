@@ -4,6 +4,7 @@ import React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
+import { OfflinePage } from "@/components/offline-page"
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
@@ -40,6 +41,25 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   render() {
     if (this.state.hasError && this.state.error) {
+      // Check if it's a network error
+      const isNetworkError = 
+        this.state.error.message?.toLowerCase().includes("failed to fetch") ||
+        this.state.error.message?.toLowerCase().includes("network") ||
+        this.state.error.message?.toLowerCase().includes("connection") ||
+        this.state.error.message?.toLowerCase().includes("timeout") ||
+        !navigator.onLine
+
+      // Use OfflinePage for network errors, otherwise use the fallback
+      if (isNetworkError) {
+        return (
+          <OfflinePage 
+            error={this.state.error} 
+            isNetworkError={true}
+            onRetry={this.resetError}
+          />
+        )
+      }
+
       const Fallback = this.props.fallback || DefaultErrorFallback
       return <Fallback error={this.state.error} resetError={this.resetError} />
     }

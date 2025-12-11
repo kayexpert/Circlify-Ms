@@ -58,12 +58,23 @@ export function personalizeMessage(
     personalized = personalized.replace(/\{FirstName\}/gi, values.FirstName)
     personalized = personalized.replace(/\{first_name\}/gi, values.FirstName)
     personalized = personalized.replace(/\{firstname\}/gi, values.FirstName)
+    personalized = personalized.replace(/\{firstName\}/gi, values.FirstName)
   }
   
   if (values.LastName) {
     personalized = personalized.replace(/\{LastName\}/gi, values.LastName)
     personalized = personalized.replace(/\{last_name\}/gi, values.LastName)
     personalized = personalized.replace(/\{lastname\}/gi, values.LastName)
+    personalized = personalized.replace(/\{lastName\}/gi, values.LastName)
+  }
+  
+  // Support FullName placeholder (combines FirstName and LastName)
+  if (values.FirstName || values.LastName) {
+    const fullName = [values.FirstName, values.LastName].filter(Boolean).join(" ")
+    personalized = personalized.replace(/\{FullName\}/gi, fullName)
+    personalized = personalized.replace(/\{full_name\}/gi, fullName)
+    personalized = personalized.replace(/\{fullname\}/gi, fullName)
+    personalized = personalized.replace(/\{fullName\}/gi, fullName)
   }
   
   if (values.PhoneNumber) {

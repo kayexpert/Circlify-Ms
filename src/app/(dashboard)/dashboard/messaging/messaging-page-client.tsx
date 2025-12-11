@@ -21,10 +21,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { 
   MessageSquare, Send, Eye, Trash2, Edit, Plus, X, 
   DollarSign, TrendingUp, Clock, Settings, Bell,
-  Users, Building, ChevronDown, Search, EyeOff
+  Users, Building, ChevronDown, Search, EyeOff, Loader2
 } from "lucide-react"
 import { toast } from "sonner"
 import { Pagination } from "@/components/ui/pagination"
+import { Spinner, CompactLoader } from "@/components/ui/loader"
 import { formatDate, formatPhoneNumber, personalizeMessage, calculateSMSCost, truncateText, validateMessageLength } from "./utils"
 import type { 
   Message, Template, APIConfiguration, NotificationSettings,
@@ -761,12 +762,88 @@ export function MessagingPageClient() {
                     </p>
                   </div>
 
+                  {/* Placeholders Info Box */}
                   <div className="p-4 bg-muted rounded-lg space-y-2">
                     <p className="text-sm font-semibold">Available Placeholders:</p>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>{"{firstName}"} - Member's first name</p>
-                      <p>{"{lastName}"} - Member's last name</p>
-                      <p>{"{fullName}"} - Member's full name</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const textarea = document.getElementById("template-message") as HTMLTextAreaElement
+                          if (textarea) {
+                            const start = textarea.selectionStart
+                            const end = textarea.selectionEnd
+                            const text = templateForm.message
+                            const before = text.substring(0, start)
+                            const after = text.substring(end)
+                            setTemplateForm(prev => ({ ...prev, message: before + "{FirstName}" + after }))
+                            setTimeout(() => {
+                              textarea.focus()
+                              textarea.setSelectionRange(start + "{FirstName}".length, start + "{FirstName}".length)
+                            }, 0)
+                          } else {
+                            setTemplateForm(prev => ({ ...prev, message: prev.message + "{FirstName}" }))
+                          }
+                        }}
+                        disabled={createTemplate.isPending || updateTemplate.isPending}
+                        className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {"{FirstName}"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const textarea = document.getElementById("template-message") as HTMLTextAreaElement
+                          if (textarea) {
+                            const start = textarea.selectionStart
+                            const end = textarea.selectionEnd
+                            const text = templateForm.message
+                            const before = text.substring(0, start)
+                            const after = text.substring(end)
+                            setTemplateForm(prev => ({ ...prev, message: before + "{LastName}" + after }))
+                            setTimeout(() => {
+                              textarea.focus()
+                              textarea.setSelectionRange(start + "{LastName}".length, start + "{LastName}".length)
+                            }, 0)
+                          } else {
+                            setTemplateForm(prev => ({ ...prev, message: prev.message + "{LastName}" }))
+                          }
+                        }}
+                        disabled={createTemplate.isPending || updateTemplate.isPending}
+                        className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {"{LastName}"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const textarea = document.getElementById("template-message") as HTMLTextAreaElement
+                          if (textarea) {
+                            const start = textarea.selectionStart
+                            const end = textarea.selectionEnd
+                            const text = templateForm.message
+                            const before = text.substring(0, start)
+                            const after = text.substring(end)
+                            setTemplateForm(prev => ({ ...prev, message: before + "{FullName}" + after }))
+                            setTimeout(() => {
+                              textarea.focus()
+                              textarea.setSelectionRange(start + "{FullName}".length, start + "{FullName}".length)
+                            }, 0)
+                          } else {
+                            setTemplateForm(prev => ({ ...prev, message: prev.message + "{FullName}" }))
+                          }
+                        }}
+                        disabled={createTemplate.isPending || updateTemplate.isPending}
+                        className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {"{FullName}"}
+                      </button>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                      <p>• {"{FirstName}"} - Member's first name</p>
+                      <p>• {"{LastName}"} - Member's last name</p>
+                      <p>• {"{FullName}"} - Member's full name</p>
+                      <p className="text-muted-foreground/70 italic">Click a placeholder above to insert it into your message</p>
                     </div>
                   </div>
 
@@ -1215,61 +1292,6 @@ export function MessagingPageClient() {
                   </CardContent>
                 </Card>
 
-                {/* Event Notifications */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Bell className="h-5 w-5" />
-                        <CardTitle>Event Notifications</CardTitle>
-                      </div>
-                      <Switch
-                        checked={(safeNotificationSettings as any).eventNotificationsEnabled || false}
-                        onCheckedChange={(checked) => {
-                          updateNotificationSettingsMutation.mutate({
-                            eventNotificationsEnabled: checked,
-                          })
-                        }}
-                        disabled={updateNotificationSettingsMutation.isPending}
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Automatically send SMS notifications for events. Configuration coming soon.
-                    </p>
-                    
-                    {(safeNotificationSettings as any).eventNotificationsEnabled && (
-                      <div className="space-y-2 pt-2 border-t">
-                        <Label htmlFor="event-template">Select Template (Optional)</Label>
-                        <Select
-                          value={(safeNotificationSettings as any).eventTemplateId || "default"}
-                          onValueChange={(value) => {
-                            updateNotificationSettingsMutation.mutate({
-                              eventTemplateId: value === "default" ? undefined : value,
-                            })
-                          }}
-                          disabled={updateNotificationSettingsMutation.isPending}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Use default template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="default">Use default template</SelectItem>
-                            {templates.map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-sm text-muted-foreground">
-                          Event notification templates will be configured in the Events module.
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
           </Tabs>

@@ -35,8 +35,6 @@ export interface NotificationSettings {
   birthdayTemplateId?: string
   contributionNotificationsEnabled: boolean
   contributionTemplateId?: string
-  eventNotificationsEnabled: boolean
-  eventTemplateId?: string
 }
 
 export interface IndividualMessageForm {

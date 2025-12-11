@@ -43,7 +43,7 @@ export function Header() {
   const pageInfo = getPageInfo(pathname)
 
   return (
-    <header className="sticky top-0 flex h-16 w-full items-center bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+    <header className="flex-shrink-0 flex h-16 w-full items-center bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
       <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
         <div className="flex items-center justify-between w-full gap-2 px-3 h-16 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0">
           <div className="flex items-center gap-3">

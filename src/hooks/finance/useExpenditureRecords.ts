@@ -144,8 +144,11 @@ export function useCreateExpenditureRecord() {
     },
     onSuccess: async () => {
       // Invalidate queries - balances are updated by triggers, so we just need to refresh
-      await queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       toast.success("Expenditure record created successfully")
     },
     onError: (error: Error) => {
@@ -215,8 +218,11 @@ export function useUpdateExpenditureRecord() {
     },
     onSuccess: async () => {
       // Invalidate queries - balances are updated by triggers
-      await queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       toast.success("Expenditure record updated successfully")
     },
     onError: (error: Error) => {
@@ -304,9 +310,12 @@ export function useDeleteExpenditureRecord() {
     },
     onSuccess: async () => {
       // Invalidate queries - balances are updated by triggers
-      await queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+      ])
       toast.success("Expenditure record deleted successfully")
     },
     onError: (error: Error) => {

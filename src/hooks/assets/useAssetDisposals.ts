@@ -150,11 +150,14 @@ export function useCreateAssetDisposal() {
       }
     },
     onSuccess: async () => {
-      // Invalidate and refetch all related queries to ensure UI updates
-      await queryClient.invalidateQueries({ queryKey: ["asset_disposals", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["assets", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      // Invalidate and refetch all related queries to ensure UI updates (both main and paginated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["asset_disposals", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["assets", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       // Force refetch to ensure disposal table updates immediately
       await queryClient.refetchQueries({ queryKey: ["asset_disposals", organization?.id] })
       toast.success("Asset disposal recorded successfully")

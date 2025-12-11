@@ -28,6 +28,19 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = (error.config ?? {}) as AxiosRequestConfig & { _retry?: boolean };
 
+    // Check for network errors
+    if (!error.response) {
+      // Network error (no response from server)
+      const isOffline = !navigator.onLine;
+      const networkError = new Error(
+        isOffline 
+          ? "No internet connection. Please check your network and try again."
+          : "Network error. Unable to reach the server. Please try again."
+      );
+      networkError.name = "NetworkError";
+      return Promise.reject(networkError);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 

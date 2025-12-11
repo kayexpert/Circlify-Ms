@@ -69,6 +69,64 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 -- );
 
 -- ============================================
+-- Cron Job 3: Process Recurring Messages
+-- ============================================
+-- Schedule: Daily at midnight UTC
+-- This will process recurring messages that need to be sent based on their frequency
+--
+-- To set up manually in Supabase Dashboard:
+-- 1. Go to Database → Cron Jobs
+-- 2. Add new cron job:
+--    - Name: process_recurring_messages
+--    - Schedule: 0 0 * * * (daily at midnight UTC)
+--    - SQL:
+--      SELECT net.http_post(
+--        url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/process-recurring-messages',
+--        headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+--      );
+--
+-- Or via SQL (replace YOUR_PROJECT_REF and YOUR_SERVICE_ROLE_KEY):
+-- SELECT cron.schedule(
+--   'process_recurring_messages',
+--   '0 0 * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/process-recurring-messages',
+--     headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+--   );
+--   $$
+-- );
+
+-- ============================================
+-- Cron Job 4: Process Scheduled Messages
+-- ============================================
+-- Schedule: Every 15 minutes
+-- This will process scheduled messages that are due to be sent
+--
+-- To set up manually in Supabase Dashboard:
+-- 1. Go to Database → Cron Jobs
+-- 2. Add new cron job:
+--    - Name: process_scheduled_messages
+--    - Schedule: */15 * * * * (every 15 minutes)
+--    - SQL:
+--      SELECT net.http_post(
+--        url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/process-scheduled-messages',
+--        headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+--      );
+--
+-- Or via SQL (replace YOUR_PROJECT_REF and YOUR_SERVICE_ROLE_KEY):
+-- SELECT cron.schedule(
+--   'process_scheduled_messages',
+--   '*/15 * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/process-scheduled-messages',
+--     headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+--   );
+--   $$
+-- );
+
+-- ============================================
 -- Helper Function: Get Cron Job Status
 -- ============================================
 -- This function can be used to check if cron jobs are running
@@ -97,7 +155,12 @@ BEGIN
     j.active,
     j.jobname
   FROM cron.job j
-  WHERE j.jobname IN ('process_birthday_messages', 'process_event_reminders')
+  WHERE j.jobname IN (
+    'process_birthday_messages', 
+    'process_event_reminders',
+    'process_recurring_messages',
+    'process_scheduled_messages'
+  )
   ORDER BY j.jobname;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -108,5 +171,5 @@ GRANT EXECUTE ON FUNCTION get_cron_job_status() TO authenticated;
 -- ============================================
 -- Comments
 -- ============================================
-COMMENT ON FUNCTION get_cron_job_status() IS 'Returns the status of birthday and event reminder cron jobs';
+COMMENT ON FUNCTION get_cron_job_status() IS 'Returns the status of all messaging cron jobs (birthday messages, event reminders, recurring messages, and scheduled messages)';
 

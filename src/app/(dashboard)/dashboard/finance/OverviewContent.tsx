@@ -35,24 +35,36 @@ export default function OverviewContent() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
     return incomeRecords.filter((record) => {
-      const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
+      // Handle both Date objects and date strings
+      let recordDate: Date
+      if (record.date instanceof Date) {
+        recordDate = record.date
+      } else if (typeof record.date === 'string') {
+        // Parse date string (format: YYYY-MM-DD or ISO string)
+        recordDate = new Date(record.date)
+      } else {
+        return false
+      }
+      
+      // Normalize to start of day for comparison
+      const recordDateNormalized = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
       
       switch (timeFilter) {
         case "month": {
           const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         case "quarter": {
           const quarter = Math.floor(today.getMonth() / 3)
           const firstDay = new Date(today.getFullYear(), quarter * 3, 1)
-          const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         case "year": {
           const firstDay = new Date(today.getFullYear(), 0, 1)
-          const lastDay = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), 11, 31)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         default:
           return true
@@ -67,24 +79,36 @@ export default function OverviewContent() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
     return expenditureRecords.filter((record) => {
-      const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
+      // Handle both Date objects and date strings
+      let recordDate: Date
+      if (record.date instanceof Date) {
+        recordDate = record.date
+      } else if (typeof record.date === 'string') {
+        // Parse date string (format: YYYY-MM-DD or ISO string)
+        recordDate = new Date(record.date)
+      } else {
+        return false
+      }
+      
+      // Normalize to start of day for comparison
+      const recordDateNormalized = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
       
       switch (timeFilter) {
         case "month": {
           const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         case "quarter": {
           const quarter = Math.floor(today.getMonth() / 3)
           const firstDay = new Date(today.getFullYear(), quarter * 3, 1)
-          const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         case "year": {
           const firstDay = new Date(today.getFullYear(), 0, 1)
-          const lastDay = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
+          const lastDay = new Date(today.getFullYear(), 11, 31)
+          return recordDateNormalized >= firstDay && recordDateNormalized <= lastDay
         }
         default:
           return true

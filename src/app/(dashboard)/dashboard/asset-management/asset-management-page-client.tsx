@@ -1,17 +1,20 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, lazy, Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { useIncomeRecords, type IncomeRecord } from "@/hooks/useIncomeRecords"
+import { CompactLoader } from "@/components/ui/loader"
+import type { IncomeRecord } from "@/app/(dashboard)/dashboard/finance/types"
 import type { Asset, DisposalRecord, AssetCategory, Account } from "./types"
 import { STORAGE_KEYS, loadFromStorage, saveToStorage } from "./utils"
-import OverviewContent from "./OverviewContent"
-import DisposalContent from "./DisposalContent"
-import CategoriesContent from "./CategoriesContent"
-import DisposalDrawer from "./DisposalDrawer"
+
+// Lazy load tab components - only load when needed
+const OverviewContent = lazy(() => import("./OverviewContent").then(m => ({ default: m.default })))
+const DisposalContent = lazy(() => import("./DisposalContent").then(m => ({ default: m.default })))
+const CategoriesContent = lazy(() => import("./CategoriesContent").then(m => ({ default: m.default })))
+const DisposalDrawer = lazy(() => import("./DisposalDrawer").then(m => ({ default: m.default })))
 
 export function AssetManagementPageClient() {
   // State
@@ -29,7 +32,9 @@ export function AssetManagementPageClient() {
   const [categorySearchQuery, setCategorySearchQuery] = useState("")
 
   // Income records hook
-  const { incomeRecords, setIncomeRecords } = useIncomeRecords()
+  // Note: Income records are now managed by database hooks in DisposalDrawer
+  // This local state is for legacy compatibility only
+  const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([])
 
   // Form states
   const [assetFormData, setAssetFormData] = useState({
@@ -573,29 +578,39 @@ export function AssetManagementPageClient() {
 
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-4">
-          <OverviewContent
-            onOpenDisposalDrawer={openDisposalDrawer}
-            onNavigateToCategories={() => setActiveTab("categories")}
-          />
+          <Suspense fallback={<CompactLoader />}>
+            <OverviewContent
+              onOpenDisposalDrawer={openDisposalDrawer}
+              onNavigateToCategories={() => setActiveTab("categories")}
+            />
+          </Suspense>
         </TabsContent>
 
         {/* DISPOSAL TAB */}
         <TabsContent value="disposal" className="space-y-4">
-          <DisposalContent />
+          <Suspense fallback={<CompactLoader />}>
+            <DisposalContent />
+          </Suspense>
         </TabsContent>
 
         {/* CATEGORIES TAB */}
         <TabsContent value="categories" className="space-y-4">
-          <CategoriesContent />
+          <Suspense fallback={<CompactLoader />}>
+            <CategoriesContent />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
       {/* Disposal Drawer (from Overview tab) */}
-      <DisposalDrawer
-        isOpen={isDisposalDrawerOpen}
-        onOpenChange={setIsDisposalDrawerOpen}
-        selectedAsset={selectedAssetForDisposal}
-      />
+      {isDisposalDrawerOpen && (
+        <Suspense fallback={null}>
+          <DisposalDrawer
+            isOpen={isDisposalDrawerOpen}
+            onOpenChange={setIsDisposalDrawerOpen}
+            selectedAsset={selectedAssetForDisposal}
+          />
+        </Suspense>
+      )}
 
       {/* Delete Disposal Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

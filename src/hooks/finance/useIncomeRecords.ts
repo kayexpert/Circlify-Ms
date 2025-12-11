@@ -202,8 +202,11 @@ export function useCreateIncomeRecord() {
     },
     onSuccess: async (createdRecord, variables) => {
       // Invalidate and refetch accounts to ensure balance is updated
-      await queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       // Force refetch accounts immediately
       await queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] })
       toast.success("Income record created successfully")
@@ -523,8 +526,11 @@ export function useUpdateIncomeRecord() {
     },
     onSuccess: async () => {
       // Invalidate queries - balances are updated by triggers
-      await queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       toast.success("Income record updated successfully")
     },
     onError: (error: Error) => {
@@ -565,8 +571,11 @@ export function useDeleteIncomeRecord() {
     },
     onSuccess: async () => {
       // Invalidate queries - balances are updated by triggers
-      await queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       toast.success("Income record deleted successfully")
     },
     onError: (error: Error) => {

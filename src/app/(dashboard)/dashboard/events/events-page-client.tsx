@@ -36,6 +36,7 @@ import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent } from "@/hoo
 import { useMembers } from "@/hooks/members/useMembers"
 import { useGroups } from "@/hooks/members/useGroups"
 import { useDepartments } from "@/hooks/members/useDepartments"
+import { useMessagingTemplates } from "@/hooks/messaging/useMessagingTemplates"
 import { formatDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
 import FullCalendar from "@fullcalendar/react"
@@ -58,6 +59,8 @@ interface EventFormData {
   reminder_send_time: "day_before" | "day_of" | ""
   reminder_recipient_type: "all_members" | "groups" | "selected_members" | ""
   reminder_recipient_ids: string[]
+  reminder_template_id: string | null
+  reminder_message_text: string
   color: string
 }
 
@@ -99,6 +102,7 @@ export function EventsPageClient() {
   const { data: members = [] } = useMembers()
   const { data: groups = [] } = useGroups()
   const { data: departments = [] } = useDepartments()
+  const { data: templates = [] } = useMessagingTemplates()
 
   // Mutations
   const createEvent = useCreateEvent()
@@ -119,6 +123,8 @@ export function EventsPageClient() {
     reminder_send_time: "",
     reminder_recipient_type: "",
     reminder_recipient_ids: [],
+    reminder_template_id: null,
+    reminder_message_text: "",
     color: EVENT_COLORS[0],
   })
 
@@ -152,6 +158,8 @@ export function EventsPageClient() {
       reminder_send_time: "",
       reminder_recipient_type: "",
       reminder_recipient_ids: [],
+      reminder_template_id: null,
+      reminder_message_text: "",
       color: EVENT_COLORS[0],
     })
     setSelectedEvent(null)
@@ -179,6 +187,8 @@ export function EventsPageClient() {
       reminder_send_time: event.reminder_send_time || "",
       reminder_recipient_type: event.reminder_recipient_type || "",
       reminder_recipient_ids: Array.isArray(event.reminder_recipient_ids) ? event.reminder_recipient_ids : [],
+      reminder_template_id: event.reminder_template_id || null,
+      reminder_message_text: event.reminder_message_text || "",
       color: event.color || EVENT_COLORS[0],
     })
     setIsEventSheetOpen(true)
@@ -190,6 +200,30 @@ export function EventsPageClient() {
     
     if (!eventForm.name || !eventForm.event_date) {
       toast.error("Please fill in all required fields")
+      return
+    }
+
+    // Validate reminder settings if enabled
+    if (eventForm.reminder_enabled) {
+      if (!eventForm.reminder_send_time) {
+        toast.error("Please select when to send reminders")
+        return
+      }
+      if (!eventForm.reminder_recipient_type) {
+        toast.error("Please select recipient type for reminders")
+        return
+      }
+      if (eventForm.reminder_recipient_type === "groups" || eventForm.reminder_recipient_type === "selected_members") {
+        if (!eventForm.reminder_recipient_ids || eventForm.reminder_recipient_ids.length === 0) {
+          toast.error(`Please select at least one ${eventForm.reminder_recipient_type === "groups" ? "group" : "member"} for reminders`)
+          return
+        }
+      }
+    }
+
+    // Validate recurring event settings
+    if (eventForm.is_recurring && !eventForm.recurrence_frequency) {
+      toast.error("Please select recurrence frequency for recurring events")
       return
     }
 
@@ -207,6 +241,8 @@ export function EventsPageClient() {
         reminder_send_time: eventForm.reminder_enabled && eventForm.reminder_send_time ? eventForm.reminder_send_time : null,
         reminder_recipient_type: eventForm.reminder_enabled && eventForm.reminder_recipient_type ? eventForm.reminder_recipient_type : null,
         reminder_recipient_ids: eventForm.reminder_enabled && eventForm.reminder_recipient_ids.length > 0 ? eventForm.reminder_recipient_ids : null,
+        reminder_template_id: eventForm.reminder_enabled && eventForm.reminder_template_id ? eventForm.reminder_template_id : null,
+        reminder_message_text: eventForm.reminder_enabled && eventForm.reminder_message_text ? eventForm.reminder_message_text : null,
         color: eventForm.color || EVENT_COLORS[0],
       }
     
@@ -245,14 +281,45 @@ export function EventsPageClient() {
     if (eventForm.reminder_recipient_type === "all_members") {
       return []
     } else if (eventForm.reminder_recipient_type === "groups") {
-      return groups.map(g => ({ id: g.id, name: g.name, type: "group" }))
+      const allGroups = groups.map(g => ({ id: String(g.id), name: g.name, type: "group" }))
+      // Always include selected groups even if they don't match search
+      const selectedGroupIds = eventForm.reminder_recipient_ids.map(id => String(id))
+      const selectedGroups = allGroups.filter(g => selectedGroupIds.includes(g.id))
+      const filteredGroups = reminderSearchQuery === "" 
+        ? allGroups 
+        : allGroups.filter(g => g.name.toLowerCase().includes(reminderSearchQuery.toLowerCase()))
+      
+      // Combine selected (always visible) with filtered, removing duplicates
+      const combined = [...selectedGroups]
+      filteredGroups.forEach(g => {
+        if (!combined.some(c => c.id === g.id)) {
+          combined.push(g)
+        }
+      })
+      return combined
     } else if (eventForm.reminder_recipient_type === "selected_members") {
-      return members
-        .filter((m: any) =>
-          reminderSearchQuery === "" ||
-          `${m.first_name} ${m.last_name}`.toLowerCase().includes(reminderSearchQuery.toLowerCase())
-        )
-        .map((m: any) => ({ id: m.id, name: `${m.first_name} ${m.last_name}`, type: "member" }))
+      const allMembers = members.map((m: any) => ({ 
+        id: String(m.uuid || m.id), // Use uuid (UUID string) if available, fallback to id
+        name: `${m.first_name} ${m.last_name}`, 
+        type: "member" 
+      }))
+      // Always include selected members even if they don't match search
+      const selectedMemberIds = eventForm.reminder_recipient_ids.map(id => String(id))
+      const selectedMembers = allMembers.filter((m: { id: string; name: string; type: string }) => selectedMemberIds.includes(m.id))
+      const filteredMembers = reminderSearchQuery === ""
+        ? allMembers
+        : allMembers.filter((m: any) =>
+            m.name.toLowerCase().includes(reminderSearchQuery.toLowerCase())
+          )
+      
+      // Combine selected (always visible) with filtered, removing duplicates
+      const combined = [...selectedMembers]
+      filteredMembers.forEach((m: { id: string; name: string; type: string }) => {
+        if (!combined.some(c => c.id === m.id)) {
+          combined.push(m)
+        }
+      })
+      return combined
     }
     return []
   }
@@ -260,10 +327,12 @@ export function EventsPageClient() {
   // Toggle reminder recipient selection
   const toggleReminderRecipient = (id: string) => {
     const current = eventForm.reminder_recipient_ids || []
-    if (current.includes(id)) {
-      setEventForm({ ...eventForm, reminder_recipient_ids: current.filter(i => i !== id) })
+    const idString = String(id)
+    // Use string comparison for consistency
+    if (current.some(i => String(i) === idString)) {
+      setEventForm({ ...eventForm, reminder_recipient_ids: current.filter(i => String(i) !== idString) })
     } else {
-      setEventForm({ ...eventForm, reminder_recipient_ids: [...current, id] })
+      setEventForm({ ...eventForm, reminder_recipient_ids: [...current, idString] })
     }
   }
 
@@ -726,6 +795,21 @@ export function EventsPageClient() {
                       <SelectItem value="day_of">On the day of the event</SelectItem>
                     </SelectContent>
                   </Select>
+                  {eventForm.reminder_send_time && (
+                    <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
+                      {eventForm.reminder_send_time === "day_before" ? (
+                        <>
+                          <strong>ℹ️ Note:</strong> For "day before" reminders, the reminder will be sent <strong>one day before</strong> the event date. 
+                          For example, if the event is on Dec 12, the reminder will be sent on Dec 11.
+                        </>
+                      ) : (
+                        <>
+                          <strong>ℹ️ Note:</strong> For "day of" reminders, the reminder will be sent on the <strong>same day</strong> as the event. 
+                          For example, if the event is on Dec 12, the reminder will be sent on Dec 12.
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Reminder Recipient Type */}
@@ -770,7 +854,8 @@ export function EventsPageClient() {
                               <span className="text-muted-foreground">Select recipients</span>
                             ) : (
                               eventForm.reminder_recipient_ids.map((id) => {
-                                const option = getReminderRecipientOptions().find((o: any) => o.id === id)
+                                // Ensure consistent string comparison
+                                const option = getReminderRecipientOptions().find((o: any) => String(o.id) === String(id))
                                 return option ? (
                                   <Badge
                                     key={id}
@@ -784,13 +869,13 @@ export function EventsPageClient() {
                                       tabIndex={0}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        toggleReminderRecipient(id)
+                                        toggleReminderRecipient(String(id))
                                       }}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter' || e.key === ' ') {
                                           e.preventDefault()
                                           e.stopPropagation()
-                                          toggleReminderRecipient(id)
+                                          toggleReminderRecipient(String(id))
                                         }
                                       }}
                                       className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
@@ -821,18 +906,23 @@ export function EventsPageClient() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           <div className="p-2">
-                            {getReminderRecipientOptions().map((option: any) => (
-                              <div
-                                key={option.id}
-                                className="flex items-center space-x-2 p-2 hover:bg-accent rounded-sm cursor-pointer"
-                                onClick={() => toggleReminderRecipient(String(option.id))}
-                              >
-                                <Checkbox
-                                  checked={eventForm.reminder_recipient_ids.includes(String(option.id))}
-                                />
-                                <Label className="cursor-pointer flex-1">{option.name}</Label>
-                              </div>
-                            ))}
+                            {getReminderRecipientOptions().map((option: any) => {
+                              const optionIdString = String(option.id)
+                              const isSelected = eventForm.reminder_recipient_ids.some(id => String(id) === optionIdString)
+                              return (
+                                <div
+                                  key={option.id}
+                                  className="flex items-center space-x-2 p-2 hover:bg-accent rounded-sm cursor-pointer"
+                                  onClick={() => toggleReminderRecipient(optionIdString)}
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleReminderRecipient(optionIdString)}
+                                  />
+                                  <Label className="cursor-pointer flex-1">{option.name}</Label>
+                                </div>
+                              )
+                            })}
                             {getReminderRecipientOptions().length === 0 && (
                               <div className="p-4 text-center text-sm text-muted-foreground">
                                 No options available
@@ -842,6 +932,225 @@ export function EventsPageClient() {
                         </ScrollArea>
                       </PopoverContent>
                     </Popover>
+                  </div>
+                )}
+
+                {/* Reminder Message Template */}
+                <div className="space-y-2">
+                  <Label htmlFor="reminder-template">Message Template (Optional)</Label>
+                  <Select
+                    value={eventForm.reminder_template_id || "none"}
+                    onValueChange={(value) => {
+                      setEventForm({ 
+                        ...eventForm, 
+                        reminder_template_id: value === "none" ? null : value,
+                        // Clear custom message if template is selected
+                        reminder_message_text: value !== "none" ? "" : eventForm.reminder_message_text
+                      })
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a template or use custom message" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[110]">
+                      <SelectItem value="none">Use custom message</SelectItem>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    If a template is selected, it will be used for the reminder message. Otherwise, use the custom message below.
+                  </p>
+                </div>
+
+                {/* Reminder Custom Message */}
+                {(!eventForm.reminder_template_id || eventForm.reminder_template_id === "none") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="reminder-message">Custom Reminder Message</Label>
+                    <Textarea
+                      id="reminder-message"
+                      value={eventForm.reminder_message_text}
+                      onChange={(e) => setEventForm({ ...eventForm, reminder_message_text: e.target.value })}
+                      rows={4}
+                      placeholder="Enter your reminder message here..."
+                    />
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Available Placeholders:</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{EventName}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 11, start + 11)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{EventName}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{EventName}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{EventDate}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 11, start + 11)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{EventDate}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{EventDate}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{EventTime}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 11, start + 11)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{EventTime}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{EventTime}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{Location}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 10, start + 10)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{Location}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{Location}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{Description}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 13, start + 13)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{Description}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{Description}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{FirstName}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 11, start + 11)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{FirstName}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{FirstName}"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.getElementById("reminder-message") as HTMLTextAreaElement
+                            if (textarea) {
+                              const start = textarea.selectionStart || 0
+                              const end = textarea.selectionEnd || 0
+                              const text = eventForm.reminder_message_text
+                              const newText = text.substring(0, start) + "{LastName}" + text.substring(end)
+                              setEventForm({ ...eventForm, reminder_message_text: newText })
+                              setTimeout(() => {
+                                textarea.focus()
+                                textarea.setSelectionRange(start + 10, start + 10)
+                              }, 0)
+                            } else {
+                              setEventForm({ ...eventForm, reminder_message_text: eventForm.reminder_message_text + "{LastName}" })
+                            }
+                          }}
+                          className="text-xs px-2 py-1 rounded bg-background border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {"{LastName}"}
+                        </button>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>• {"{EventName}"} - Event name</p>
+                        <p>• {"{EventDate}"} - Event date (formatted)</p>
+                        <p>• {"{EventTime}"} - Event time (if set)</p>
+                        <p>• {"{Location}"} - Event location (if set)</p>
+                        <p>• {"{Description}"} - Event description (if set)</p>
+                        <p>• {"{FirstName}"} - Recipient's first name</p>
+                        <p>• {"{LastName}"} - Recipient's last name</p>
+                        <p className="text-muted-foreground/70 italic mt-2">Click a placeholder above to insert it into your message</p>
+                      </div>
+                    </div>
+                    {!eventForm.reminder_message_text && !eventForm.reminder_template_id && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ If no template or custom message is provided, a default message will be used.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

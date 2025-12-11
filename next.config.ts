@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
   },
 
   // Turbopack configuration - set root to current directory to avoid lockfile warnings
+  // This helps with local development but Vercel uses its own build system
   turbopack: {
     root: process.cwd(),
   },

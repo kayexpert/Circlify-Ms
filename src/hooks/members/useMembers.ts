@@ -114,11 +114,12 @@ export function useMembersByStatus(status: "active" | "inactive" | "visitor") {
 
       const { data, error } = await (supabase
         .from("members") as any)
-        .select("*")
+        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments")
         .eq("organization_id", organization.id)
         .eq("membership_status", status)
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true })
+        .limit(1000) // Limit to prevent loading too much data
 
       if (error) {
         console.error("Error fetching members by status:", error)
@@ -182,8 +183,12 @@ export function useCreateMember() {
 
       return convertMember(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["members", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["members", "paginated", organization?.id] }),
+      ])
       toast.success("Member created successfully")
     },
     onError: (error: Error) => {
@@ -252,9 +257,10 @@ export function useUpdateMember() {
       return convertMember(data)
     },
     onSuccess: async (updatedMember) => {
-      // Invalidate and refetch to ensure UI is updated
+      // Invalidate and refetch to ensure UI is updated (both main and paginated)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["members", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["members", "paginated", organization?.id] }),
         queryClient.refetchQueries({ queryKey: ["members", organization?.id] }),
       ])
       toast.success("Member updated successfully")
@@ -290,8 +296,12 @@ export function useDeleteMember() {
         throw error
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["members", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["members", "paginated", organization?.id] }),
+      ])
       toast.success("Member deleted successfully")
     },
     onError: (error: Error) => {
@@ -315,7 +325,7 @@ export function useMember(memberId: string | null) {
 
       const { data, error } = await (supabase
         .from("members") as any)
-        .select("*")
+        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, created_at, updated_at")
         .eq("id", memberId)
         .eq("organization_id", organization.id)
         .single()

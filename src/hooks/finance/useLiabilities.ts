@@ -132,8 +132,12 @@ export function useCreateLiability() {
 
       return convertLiability(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+      ])
       toast.success("Liability created successfully")
     },
     onError: (error: Error) => {
@@ -184,8 +188,12 @@ export function useUpdateLiability() {
 
       return convertLiability(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate both main and paginated queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+      ])
       toast.success("Liability updated successfully")
     },
     onError: (error: Error) => {
@@ -271,10 +279,14 @@ export function useDeleteLiability() {
       }
     },
     onSuccess: async () => {
-      // Invalidate all related queries
-      await queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
-      await queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+      // Invalidate all related queries (both main and paginated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+      ])
       // Force refetch to ensure UI updates
       await queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
       await queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] })
@@ -301,7 +313,7 @@ export function useLiability(liabilityId: string | null) {
 
       const { data, error } = await supabase
         .from("finance_liabilities")
-        .select("*")
+        .select("id, organization_id, date, category, description, creditor, original_amount, amount_paid, balance, status, created_at, updated_at")
         .eq("id", liabilityId)
         .eq("organization_id", organization.id)
         .single()
@@ -333,7 +345,7 @@ export function useLiabilityPayments(liabilityId: string | null) {
 
       const { data, error } = await supabase
         .from("finance_expenditure_records")
-        .select("*")
+        .select("id, date, description, category, amount, method, reference, account_id, linked_liability_id, linked_liability_name, is_reconciled, reconciled_in_reconciliation, created_at")
         .eq("linked_liability_id", liabilityId)
         .eq("organization_id", organization.id)
         .order("date", { ascending: false })

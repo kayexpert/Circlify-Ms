@@ -23,7 +23,7 @@ export function useCategories() {
 
       const { data, error } = await supabase
         .from("finance_categories")
-        .select("*")
+        .select("id, organization_id, name, description, type, track_members, created_at, updated_at")
         .eq("organization_id", organization.id)
         .order("type", { ascending: true })
         .order("name", { ascending: true })
@@ -59,14 +59,14 @@ export function useCategoriesPaginated(page: number = 1, pageSize: number = 20) 
       const [dataResult, countResult] = await Promise.all([
         supabase
           .from("finance_categories")
-          .select("*")
+          .select("id, organization_id, name, description, type, track_members, created_at, updated_at")
           .eq("organization_id", organization.id)
           .order("type", { ascending: true })
           .order("name", { ascending: true })
           .range(from, to),
         supabase
           .from("finance_categories")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("organization_id", organization.id)
       ])
 
@@ -105,7 +105,7 @@ export function useCategoriesByType(type: "income" | "expense" | "liability") {
 
       const { data, error } = await supabase
         .from("finance_categories")
-        .select("*")
+        .select("id, organization_id, name, description, type, track_members, created_at, updated_at")
         .eq("organization_id", organization.id)
         .eq("type", type)
         .order("name", { ascending: true })
