@@ -23,6 +23,7 @@ import { formatDate, formatRecordDate, formatCurrency } from "./utils"
 import { useMembersPaginated, useCreateMember, useUpdateMember, useDeleteMember } from "@/hooks/members"
 import { useGroups } from "@/hooks/members"
 import { useDepartments } from "@/hooks/members"
+import { useRolesPositions } from "@/hooks/members"
 import { useMemberAttendanceRecords, useDeleteMemberAttendanceRecord } from "@/hooks/members"
 import { useMemberFollowUps, useCreateMemberFollowUp, useUpdateMemberFollowUp, useDeleteMemberFollowUp } from "@/hooks/members"
 import { useIncomeRecords } from "@/hooks/finance/useIncomeRecords"
@@ -255,6 +256,7 @@ export default function MembersContent() {
   const allMembers = allMembersData as unknown as Member[]
   const { data: groups = [], isLoading: groupsLoading } = useGroups()
   const { data: departments = [], isLoading: departmentsLoading } = useDepartments()
+  const { data: rolesPositions = [] } = useRolesPositions()
   const queryClient = useQueryClient()
 
   // Mutations
@@ -310,6 +312,7 @@ export default function MembersContent() {
     membership_status: "active",
     groups: [] as string[],
     departments: [] as string[],
+    roles: [] as string[],
     notes: "",
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -338,17 +341,20 @@ export default function MembersContent() {
     if (selectedMember && allMembers.length > 0) {
       const refreshedMember = allMembers.find(m => m.id === selectedMember.id)
       if (refreshedMember) {
-        // Check if groups or departments have changed
+        // Check if groups, departments, or roles have changed
         const currentGroups = (selectedMember as any).groups || []
         const currentDepartments = (selectedMember as any).departments || []
+        const currentRoles = (selectedMember as any).roles || []
         const newGroups = (refreshedMember as any).groups || []
         const newDepartments = (refreshedMember as any).departments || []
+        const newRoles = (refreshedMember as any).roles || []
         
         const groupsChanged = JSON.stringify(newGroups) !== JSON.stringify(currentGroups)
         const departmentsChanged = JSON.stringify(newDepartments) !== JSON.stringify(currentDepartments)
+        const rolesChanged = JSON.stringify(newRoles) !== JSON.stringify(currentRoles)
         
         // Always update if there are changes, or if we're syncing after a refetch
-        if (groupsChanged || departmentsChanged) {
+        if (groupsChanged || departmentsChanged || rolesChanged) {
           // Update selectedMember with fresh data
           setSelectedMember(refreshedMember as Member)
           // Update form data to match
@@ -356,6 +362,7 @@ export default function MembersContent() {
             ...prev,
             groups: newGroups,
             departments: newDepartments,
+            roles: newRoles,
           }))
         }
       }
@@ -405,22 +412,38 @@ export default function MembersContent() {
     return departments.map(dept => ({ value: dept.name, label: dept.name }))
   }, [departments])
 
+  const rolePositionOptions = useMemo(() => {
+    return rolesPositions.map(role => ({ value: role.name, label: role.name }))
+  }, [rolesPositions])
+
   // Calculate member contributions for payment history
   // Only compute when payments tab is active to improve performance
   const memberContributions = useMemo(() => {
     if (!selectedMember || activeTab !== "payments") return []
     
     const memberFullName = `${selectedMember.first_name} ${selectedMember.last_name}`
+    const memberFullNameLower = memberFullName.toLowerCase().trim()
     
     return incomeRecords.filter((record) => {
       // Primary match: by memberId (if both exist and match)
       if (record.memberId && selectedMember.id) {
-        return record.memberId === selectedMember.id
+        if (record.memberId === selectedMember.id) {
+          return true
+        }
       }
       
-      // Secondary match: by member name (case-insensitive)
+      // Secondary match: by member name (case-insensitive, with multiple formats)
       if (record.memberName) {
-        return record.memberName.toLowerCase().trim() === memberFullName.toLowerCase().trim()
+        const recordMemberNameLower = record.memberName.toLowerCase().trim()
+        // Exact match
+        if (recordMemberNameLower === memberFullNameLower) {
+          return true
+        }
+        // Also check if the record member name contains the selected member's name
+        // This handles cases where there might be extra spaces or formatting differences
+        if (recordMemberNameLower.includes(memberFullNameLower) || memberFullNameLower.includes(recordMemberNameLower)) {
+          return true
+        }
       }
       
       return false
@@ -468,6 +491,7 @@ export default function MembersContent() {
       membership_status: "active",
       groups: [],
       departments: [],
+      roles: [],
       notes: "",
     })
     setFormErrors({})
@@ -516,6 +540,7 @@ export default function MembersContent() {
         membership_status: member.membership_status || "active",
         groups: member.groups || [],
         departments: member.departments || [],
+        roles: member.roles || [],
         notes: member.notes || "",
       })
       setDateOfBirth(dobObj && !isNaN(dobObj.getTime()) ? dobObj : undefined)
@@ -676,6 +701,7 @@ export default function MembersContent() {
         digital_address: formData.digital_address || undefined,
         groups: formData.groups || [],
         departments: formData.departments || [],
+        roles: formData.roles || [],
         notes: formData.notes || undefined,
       }
 
@@ -692,14 +718,16 @@ export default function MembersContent() {
           const updatedMemberTyped = updatedMember as Member
           setSelectedMember(updatedMemberTyped)
           
-          // Update form data with the latest groups and departments
+          // Update form data with the latest groups, departments, and roles
           const updatedGroups = (updatedMemberTyped as any).groups || []
           const updatedDepartments = (updatedMemberTyped as any).departments || []
+          const updatedRoles = (updatedMemberTyped as any).roles || []
           
           setFormData(prev => ({
             ...prev,
             groups: updatedGroups,
             departments: updatedDepartments,
+            roles: updatedRoles,
           }))
         }
       } else {
@@ -814,7 +842,7 @@ export default function MembersContent() {
       {/* Member Form Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent 
-          className="w-full sm:max-w-2xl flex flex-col h-full max-h-screen" 
+          className="w-full sm:max-w-3xl flex flex-col h-full max-h-screen" 
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <SheetHeader className="pb-6 flex-shrink-0">
@@ -861,13 +889,49 @@ export default function MembersContent() {
                       {selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : formData.first_name && formData.last_name ? `${formData.first_name} ${formData.last_name}` : "New Member"}
                     </h2>
                     {selectedMember && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          Join Date: {selectedMember.join_date ? formatDate(selectedMember.join_date) : 'N/A'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Status: {selectedMember.membership_status || 'Active'}
-                        </p>
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Join Date: {selectedMember.join_date ? formatDate(selectedMember.join_date) : 'N/A'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Status: {selectedMember.membership_status || 'Active'}
+                          </p>
+                        </div>
+                        {/* Leader Positions and Roles */}
+                        <div className="flex flex-wrap gap-2">
+                          {/* Leader Positions */}
+                          {(() => {
+                            const leaderPositions: string[] = []
+                            const memberName = `${selectedMember.first_name} ${selectedMember.last_name}`
+                            groups.forEach(group => {
+                              if (group.leader === memberName) {
+                                leaderPositions.push(`${group.name} Head`)
+                              }
+                            })
+                            departments.forEach(dept => {
+                              if (dept.leader === memberName) {
+                                leaderPositions.push(`${dept.name} Head`)
+                              }
+                            })
+                            return leaderPositions.map((position, idx) => (
+                              <Badge key={`leader-${idx}`} variant="default" className="text-xs">
+                                {position}
+                              </Badge>
+                            ))
+                          })()}
+                          {/* Roles (Max 4 displayed) */}
+                          {selectedMember.roles && selectedMember.roles.slice(0, 4).map((role, idx) => (
+                            <Badge key={`role-${idx}`} variant="secondary" className="text-xs">
+                              {role}
+                            </Badge>
+                          ))}
+                          {selectedMember.roles && selectedMember.roles.length > 4 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{selectedMember.roles.length - 4} more
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -1208,7 +1272,18 @@ export default function MembersContent() {
                           />
                         </div>
 
-                        {/* Row 3: Additional Notes */}
+                        {/* Row 3: Roles/Positions (Full Width) */}
+                        <div className="w-full">
+                          <MultiSelect
+                            options={rolePositionOptions}
+                            selected={formData.roles}
+                            onSelectionChange={(selected) => setFormData({ ...formData, roles: selected })}
+                            placeholder="Select Roles/Positions"
+                            label="Roles/Positions"
+                          />
+                        </div>
+
+                        {/* Row 4: Additional Notes */}
                         <div className="space-y-2">
                           <Label htmlFor="notes">Additional Notes</Label>
                           <Textarea 

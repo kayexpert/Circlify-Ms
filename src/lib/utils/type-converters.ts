@@ -289,6 +289,7 @@ export function convertMember(member: DBMember): ComponentMember {
     digital_address: member.digital_address || undefined,
     groups: member.groups || undefined,
     departments: member.departments || undefined,
+    roles: (member as any).roles || undefined,
     notes: member.notes || undefined,
   }
 }

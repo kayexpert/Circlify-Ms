@@ -65,5 +65,5 @@ export interface ComprehensiveReport {
   }
 }
 
-export type ReportType = "financial" | "members" | "attendance" | "assets" | "comprehensive"
+export type ReportType = "financial" | "members" | "attendance" | "assets"
 export type PeriodType = "today" | "week" | "month" | "quarter" | "year" | "custom"

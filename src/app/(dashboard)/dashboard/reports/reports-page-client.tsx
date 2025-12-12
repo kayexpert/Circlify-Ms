@@ -1,17 +1,16 @@
 "use client"
 
-import React, { useState, lazy, Suspense } from "react"
+import { useState, lazy, Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DollarSign, Users, Calendar, Package, BarChart3 } from "lucide-react"
+import { DollarSign, Users, Calendar, Package } from "lucide-react"
 import { CompactLoader } from "@/components/ui/loader"
-import type { ReportType, PeriodType } from "./types"
+import type { ReportType } from "./types"
 
 // Lazy load tab components
 const FinancialReportsContent = lazy(() => import("./FinancialReportsContent").then(m => ({ default: m.default })))
 const MemberReportsContent = lazy(() => import("./MemberReportsContent").then(m => ({ default: m.default })))
 const AttendanceReportsContent = lazy(() => import("./AttendanceReportsContent").then(m => ({ default: m.default })))
 const AssetReportsContent = lazy(() => import("./AssetReportsContent").then(m => ({ default: m.default })))
-const ComprehensiveReportsContent = lazy(() => import("./ComprehensiveReportsContent").then(m => ({ default: m.default })))
 
 export function ReportsPageClient() {
   const [activeTab, setActiveTab] = useState<ReportType>("financial")
@@ -25,7 +24,7 @@ export function ReportsPageClient() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ReportType)} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
           <TabsTrigger value="financial" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Financial</span>
@@ -41,10 +40,6 @@ export function ReportsPageClient() {
           <TabsTrigger value="assets" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             <span className="hidden sm:inline">Assets</span>
-          </TabsTrigger>
-          <TabsTrigger value="comprehensive" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
         </TabsList>
 
@@ -73,13 +68,6 @@ export function ReportsPageClient() {
         <TabsContent value="assets" className="space-y-4 mt-0">
           <Suspense fallback={<CompactLoader />}>
             {activeTab === "assets" && <AssetReportsContent />}
-          </Suspense>
-        </TabsContent>
-
-        {/* Comprehensive Reports Tab */}
-        <TabsContent value="comprehensive" className="space-y-4 mt-0">
-          <Suspense fallback={<CompactLoader />}>
-            {activeTab === "comprehensive" && <ComprehensiveReportsContent />}
           </Suspense>
         </TabsContent>
       </Tabs>

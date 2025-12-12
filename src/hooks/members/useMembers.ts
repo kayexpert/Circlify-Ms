@@ -24,11 +24,11 @@ export function useMembers() {
 
       const { data, error } = await (supabase
         .from("members") as any)
-        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments")
+        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles")
         .eq("organization_id", orgId)
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true })
-        .limit(5000) // Increased limit for large organizations, but still bounded
+        .limit(1000) // Limit to prevent slow queries - use pagination for larger datasets
 
       if (error) {
         console.error("Error fetching members:", error)
@@ -65,7 +65,7 @@ export function useMembersPaginated(page: number = 1, pageSize: number = 20) {
       const [dataResult, countResult] = await Promise.all([
         (supabase
           .from("members") as any)
-          .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments")
+          .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles")
           .eq("organization_id", orgId)
           .order("last_name", { ascending: true })
           .order("first_name", { ascending: true })
@@ -114,7 +114,7 @@ export function useMembersByStatus(status: "active" | "inactive" | "visitor") {
 
       const { data, error } = await (supabase
         .from("members") as any)
-        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments")
+        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles")
         .eq("organization_id", organization.id)
         .eq("membership_status", status)
         .order("last_name", { ascending: true })
@@ -172,6 +172,7 @@ export function useCreateMember() {
           notes: memberData.notes || null,
           groups: Array.isArray(memberData.groups) && memberData.groups.length > 0 ? memberData.groups : [],
           departments: Array.isArray(memberData.departments) && memberData.departments.length > 0 ? memberData.departments : [],
+          roles: Array.isArray(memberData.roles) && memberData.roles.length > 0 ? memberData.roles : [],
         } as MemberInsert)
         .select()
         .single()
@@ -233,12 +234,15 @@ export function useUpdateMember() {
       if (updateData.region !== undefined) dbUpdateData.region = updateData.region || null
       if (updateData.digital_address !== undefined) dbUpdateData.digital_address = updateData.digital_address || null
       if (updateData.notes !== undefined) dbUpdateData.notes = updateData.notes || null
-      // Handle groups and departments - empty arrays should be set to empty arrays, not null
+      // Handle groups, departments, and roles - empty arrays should be set to empty arrays, not null
       if (updateData.groups !== undefined) {
         dbUpdateData.groups = Array.isArray(updateData.groups) && updateData.groups.length > 0 ? updateData.groups : []
       }
       if (updateData.departments !== undefined) {
         dbUpdateData.departments = Array.isArray(updateData.departments) && updateData.departments.length > 0 ? updateData.departments : []
+      }
+      if (updateData.roles !== undefined) {
+        dbUpdateData.roles = Array.isArray(updateData.roles) && updateData.roles.length > 0 ? updateData.roles : []
       }
 
       const { data, error } = await (supabase
@@ -325,7 +329,7 @@ export function useMember(memberId: string | null) {
 
       const { data, error } = await (supabase
         .from("members") as any)
-        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, created_at, updated_at")
+        .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles, created_at, updated_at")
         .eq("id", memberId)
         .eq("organization_id", organization.id)
         .single()

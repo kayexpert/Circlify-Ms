@@ -35,7 +35,7 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem('circlify-theme') || 'dark';
+                  const theme = localStorage.getItem('circlify-theme') || 'light';
                   let isDark = false;
                   if (theme === 'dark') {
                     isDark = true;

@@ -60,7 +60,7 @@ export function useVisitors() {
         .eq("organization_id", orgId)
         .order("visit_date", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(2000) // Increased limit for large organizations
+        .limit(500) // Limit to prevent slow queries - use pagination for larger datasets
 
       if (error) {
         console.error("Error fetching visitors:", error)

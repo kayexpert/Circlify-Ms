@@ -25,6 +25,9 @@ const getPageInfo = (pathname: string): { title: string; description: string } =
   if (pathname.startsWith("/dashboard/events")) {
     return { title: "Events", description: "Manage church events and activities" }
   }
+  if (pathname.startsWith("/dashboard/projects")) {
+    return { title: "Projects", description: "Manage projects, track income and expenditure" }
+  }
   if (pathname.startsWith("/dashboard/messaging")) {
     return { title: "Messaging", description: "Send messages and manage communications" }
   }

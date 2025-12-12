@@ -65,10 +65,10 @@ export function useCreateAssetDisposal() {
     }) => {
       if (!organization?.id) throw new Error("No organization selected")
 
-      // Get asset details
+      // Get asset details - only select needed fields
       const { data: asset, error: assetError } = await supabase
         .from("assets")
-        .select("*")
+        .select("id, name, status, organization_id")
         .eq("id", assetId)
         .eq("organization_id", organization.id)
         .single()
@@ -181,10 +181,10 @@ export function useDeleteAssetDisposal() {
     mutationFn: async (disposalId: string) => {
       if (!organization?.id) throw new Error("No organization selected")
 
-      // Get disposal details
+      // Get disposal details - only select needed fields
       const { data: disposal, error: fetchError } = await supabase
         .from("asset_disposals")
-        .select("*")
+        .select("id, asset_id, linked_income_id, organization_id")
         .eq("id", disposalId)
         .eq("organization_id", organization.id)
         .single()

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -9,7 +9,7 @@ import { Download, Package, DollarSign, TrendingUp, ArrowUpRight } from "lucide-
 import { useAssets } from "@/hooks/assets"
 import { useAssetDisposals } from "@/hooks/assets"
 import type { PeriodType, DateRange, AssetSummary } from "./types"
-import { getDateRangeForPeriod, formatCurrency, formatDate, formatNumber, calculatePercentageChange, generateCSV, downloadCSV } from "./utils"
+import { getDateRangeForPeriod, formatCurrency, formatDate, formatNumber, generateCSV, downloadCSV } from "./utils"
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00ff00", "#ff00ff"]

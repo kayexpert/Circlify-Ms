@@ -477,6 +477,147 @@ export interface AssetDisposalUpdate {
 }
 
 // ============================================
+// Projects Module Types
+// ============================================
+
+export interface ProjectCategory {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectCategoryInsert {
+  id?: string
+  organization_id: string
+  name: string
+  description?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProjectCategoryUpdate {
+  name?: string
+  description?: string | null
+  updated_at?: string
+}
+
+export interface Project {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  category_id?: string | null
+  estimated_budget: number
+  status: "Active" | "Completed" | "Suspended"
+  estimated_start_date?: string | null
+  estimated_end_date?: string | null
+  actual_completion_date?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectInsert {
+  id?: string
+  organization_id: string
+  name: string
+  description?: string | null
+  category_id?: string | null
+  estimated_budget?: number
+  status?: "Active" | "Completed" | "Suspended"
+  estimated_start_date?: string | null
+  estimated_end_date?: string | null
+  actual_completion_date?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProjectUpdate {
+  name?: string
+  description?: string | null
+  category_id?: string | null
+  estimated_budget?: number
+  status?: "Active" | "Completed" | "Suspended"
+  estimated_start_date?: string | null
+  estimated_end_date?: string | null
+  actual_completion_date?: string | null
+  updated_at?: string
+}
+
+export interface ProjectIncome {
+  id: string
+  project_id: string
+  organization_id: string
+  date: string
+  amount: number
+  member_id?: string | null
+  account_id: string
+  description?: string | null
+  linked_income_record_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectIncomeInsert {
+  id?: string
+  project_id: string
+  organization_id: string
+  date: string
+  amount: number
+  member_id?: string | null
+  account_id: string
+  description?: string | null
+  linked_income_record_id?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProjectIncomeUpdate {
+  date?: string
+  amount?: number
+  member_id?: string | null
+  account_id?: string
+  description?: string | null
+  updated_at?: string
+}
+
+export interface ProjectExpenditure {
+  id: string
+  project_id: string
+  organization_id: string
+  date: string
+  amount: number
+  account_id: string
+  description?: string | null
+  linked_expenditure_record_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectExpenditureInsert {
+  id?: string
+  project_id: string
+  organization_id: string
+  date: string
+  amount: number
+  account_id: string
+  description?: string | null
+  linked_expenditure_record_id?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProjectExpenditureUpdate {
+  date?: string
+  amount?: number
+  account_id?: string
+  description?: string | null
+  updated_at?: string
+}
+
+// ============================================
 // Members Module Types
 // ============================================
 
@@ -536,6 +677,7 @@ export interface MemberInsert {
   notes?: string | null
   groups?: string[] | null
   departments?: string[] | null
+  roles?: string[] | null
   created_at?: string
   updated_at?: string
 }
@@ -564,6 +706,7 @@ export interface MemberUpdate {
   notes?: string | null
   groups?: string[] | null
   departments?: string[] | null
+  roles?: string[] | null
   updated_at?: string
 }
 
@@ -728,6 +871,33 @@ export interface DepartmentUpdate {
   name?: string
   description?: string | null
   leader?: string | null
+  status?: "Active" | "Inactive"
+  updated_at?: string
+}
+
+export interface RolePosition {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  status: "Active" | "Inactive"
+  created_at: string
+  updated_at: string
+}
+
+export interface RolePositionInsert {
+  id?: string
+  organization_id: string
+  name: string
+  description?: string | null
+  status: "Active" | "Inactive"
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RolePositionUpdate {
+  name?: string
+  description?: string | null
   status?: "Active" | "Inactive"
   updated_at?: string
 }
@@ -1138,6 +1308,26 @@ export interface ExtendedDatabase extends Database {
         Row: Event
         Insert: EventInsert
         Update: EventUpdate
+      }
+      project_categories: {
+        Row: ProjectCategory
+        Insert: ProjectCategoryInsert
+        Update: ProjectCategoryUpdate
+      }
+      projects: {
+        Row: Project
+        Insert: ProjectInsert
+        Update: ProjectUpdate
+      }
+      project_income: {
+        Row: ProjectIncome
+        Insert: ProjectIncomeInsert
+        Update: ProjectIncomeUpdate
+      }
+      project_expenditure: {
+        Row: ProjectExpenditure
+        Insert: ProjectExpenditureInsert
+        Update: ProjectExpenditureUpdate
       }
     }
   }

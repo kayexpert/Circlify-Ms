@@ -1,16 +1,139 @@
 "use client";
 import Link from "next/link";
-import React, { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useUpcomingEvents } from "@/hooks/events";
+import { useUpcomingBirthdays } from "@/hooks/members/useMemberStatistics";
+import { Calendar, Gift } from "lucide-react";
+
+interface Notification {
+  id: string;
+  type: "event" | "birthday";
+  title: string;
+  description: string;
+  time: string;
+  relativeTime: string;
+  avatar?: string | null;
+  link: string;
+  icon: "event" | "birthday";
+}
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifying, setNotifying] = useState(true);
+  const [hasSeenNotifications, setHasSeenNotifications] = useState(false);
+
+  // Fetch upcoming events (next 7 days)
+  const { data: upcomingEvents = [], isLoading: eventsLoading } = useUpcomingEvents(7);
+  
+  // Fetch upcoming birthdays (next 7 days)
+  const { data: upcomingBirthdays = [], isLoading: birthdaysLoading } = useUpcomingBirthdays(7);
+
+  const isLoading = eventsLoading || birthdaysLoading;
+
+  // Format time relative to now
+  const formatRelativeTime = (date: Date): string => {
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    if (diffDays === 0) {
+      if (diffHours === 0) {
+        if (diffMinutes <= 0) return "now";
+        return `in ${diffMinutes} min${diffMinutes > 1 ? "s" : ""}`;
+      }
+      return `in ${diffHours} hour${diffHours > 1 ? "s" : ""}`;
+    } else if (diffDays === 1) {
+      return "tomorrow";
+    } else if (diffDays < 7) {
+      return `in ${diffDays} days`;
+    }
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  // Format date for display
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString("en-US", { 
+      month: "short", 
+      day: "numeric",
+      year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined
+    });
+  };
+
+  // Combine and format notifications
+  const notifications: Notification[] = useMemo(() => {
+    const combined: Array<Notification & { date: Date }> = [];
+
+    // Add event notifications
+    upcomingEvents.forEach((event) => {
+      const eventDate = new Date(event.event_date);
+      eventDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Only show events from today onwards
+      if (eventDate >= today) {
+        combined.push({
+          id: `event-${event.id}`,
+          type: "event",
+          title: event.name,
+          description: event.location || event.event_types?.name || "Event",
+          time: formatDate(eventDate),
+          relativeTime: formatRelativeTime(eventDate),
+          avatar: null,
+          link: `/dashboard/events`,
+          icon: "event",
+          date: eventDate,
+        });
+      }
+    });
+
+    // Add birthday notifications
+    upcomingBirthdays.forEach((birthday) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const birthDate = new Date(birthday.date_of_birth);
+      const thisYear = today.getFullYear();
+      const nextBirthday = new Date(thisYear, birthDate.getMonth(), birthDate.getDate());
+      nextBirthday.setHours(0, 0, 0, 0);
+      
+      // If birthday already passed this year, use next year
+      if (nextBirthday < today) {
+        nextBirthday.setFullYear(thisYear + 1);
+      }
+
+      combined.push({
+        id: `birthday-${birthday.id}`,
+        type: "birthday",
+        title: `${birthday.first_name} ${birthday.last_name}`,
+        description: `Turning ${birthday.age + (nextBirthday.getFullYear() - thisYear)} years old`,
+        time: formatDate(nextBirthday),
+        relativeTime: formatRelativeTime(nextBirthday),
+        avatar: birthday.photo,
+        link: `/dashboard/members?tab=birthdays`,
+        icon: "birthday",
+        date: nextBirthday,
+      });
+    });
+
+    // Sort by date (soonest first) and remove the date property
+    return combined
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(0, 10) // Limit to 10 most recent
+      .map(({ date, ...notification }) => notification);
+  }, [upcomingEvents, upcomingBirthdays]);
+
+  const hasNotifications = notifications.length > 0;
+  const showNotificationBadge = hasNotifications && !hasSeenNotifications;
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
+    if (!isOpen && hasNotifications) {
+      setHasSeenNotifications(true);
+    }
   }
 
   function closeDropdown() {
@@ -19,52 +142,7 @@ export default function NotificationDropdown() {
 
   const handleClick = () => {
     toggleDropdown();
-    setNotifying(false);
   };
-
-  // Mock notification data - replace with real data from your API
-  const notifications = [
-    {
-      id: 1,
-      userName: "Terry Franci",
-      action: "requests permission to change",
-      project: "Project - Nganter App",
-      category: "Project",
-      time: "5 min ago",
-      avatar: "https://ui-avatars.com/api/?name=Terry+Franci&background=random",
-      status: "success", // green dot
-    },
-    {
-      id: 2,
-      userName: "Alena Franci",
-      action: "requests permission to change",
-      project: "Project - Nganter App",
-      category: "Project",
-      time: "8 min ago",
-      avatar: "https://ui-avatars.com/api/?name=Alena+Franci&background=random",
-      status: "success", // green dot
-    },
-    {
-      id: 3,
-      userName: "Jocelyn Kenter",
-      action: "requests permission to change",
-      project: "Project - Nganter App",
-      category: "Project",
-      time: "15 min ago",
-      avatar: "https://ui-avatars.com/api/?name=Jocelyn+Kenter&background=random",
-      status: "success", // green dot
-    },
-    {
-      id: 4,
-      userName: "Brandon Philips",
-      action: "requests permission to change",
-      project: "Project - Nganter App",
-      category: "Project",
-      time: "1 hr ago",
-      avatar: "https://ui-avatars.com/api/?name=Brandon+Philips&background=random",
-      status: "error", // red dot
-    },
-  ];
 
   return (
     <div className="relative">
@@ -72,13 +150,11 @@ export default function NotificationDropdown() {
         className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white cursor-pointer"
         onClick={handleClick}
       >
-        <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            !notifying ? "hidden" : "flex"
-          }`}
-        >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
-        </span>
+        {showNotificationBadge && (
+          <span className="absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 flex">
+            <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
+          </span>
+        )}
         <svg
           className="fill-current"
           width="20"
@@ -124,55 +200,90 @@ export default function NotificationDropdown() {
           </button>
         </div>
         <ul className="flex flex-col max-h-[380px] overflow-y-auto custom-scrollbar">
-          {notifications.map((notification) => (
-            <li key={notification.id}>
-              <DropdownItem
-                onItemClick={closeDropdown}
-                className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-              >
-                <span className="relative block w-10 h-10 rounded-full z-1 flex-shrink-0">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={notification.avatar} alt={notification.userName} />
-                    <AvatarFallback className="text-xs">
-                      {notification.userName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span
-                    className={`absolute bottom-0 right-0 z-10 h-2.5 w-2.5 rounded-full border-[1.5px] border-white dark:border-gray-900 ${
-                      notification.status === "success"
-                        ? "bg-success-500"
-                        : "bg-error-500"
-                    }`}
-                  ></span>
-                </span>
-
-                <span className="block">
-                  <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-                    <span className="font-medium text-gray-800 dark:text-white/90">
-                      {notification.userName}
-                    </span>
-                    <span>{notification.action}</span>
-                    <span className="font-medium text-gray-800 dark:text-white/90">
-                      {notification.project}
-                    </span>
-                  </span>
-
-                  <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                    <span>{notification.category}</span>
-                    <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                    <span>{notification.time}</span>
-                  </span>
-                </span>
-              </DropdownItem>
+          {isLoading ? (
+            <li className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              Loading notifications...
             </li>
-          ))}
+          ) : notifications.length === 0 ? (
+            <li className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              No upcoming events or birthdays
+            </li>
+          ) : (
+            notifications.map((notification) => (
+              <li key={notification.id}>
+                <Link href={notification.link}>
+                  <DropdownItem
+                    onItemClick={closeDropdown}
+                    className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 cursor-pointer"
+                  >
+                    <span className="relative block w-10 h-10 rounded-full z-1 flex-shrink-0">
+                      {notification.icon === "birthday" && notification.avatar ? (
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={notification.avatar} alt={notification.title} />
+                          <AvatarFallback className="text-xs bg-purple-100 dark:bg-purple-900">
+                            {notification.title.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          notification.icon === "event" 
+                            ? "bg-blue-100 dark:bg-blue-900" 
+                            : "bg-purple-100 dark:bg-purple-900"
+                        }`}>
+                          {notification.icon === "event" ? (
+                            <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          ) : (
+                            <Gift className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          )}
+                        </div>
+                      )}
+                      <span
+                        className={`absolute bottom-0 right-0 z-10 h-2.5 w-2.5 rounded-full border-[1.5px] border-white dark:border-gray-900 ${
+                          notification.icon === "event"
+                            ? "bg-blue-500"
+                            : "bg-purple-500"
+                        }`}
+                      ></span>
+                    </span>
+
+                    <span className="block flex-1 min-w-0">
+                      <span className="mb-1.5 block text-theme-sm">
+                        <span className="font-medium text-gray-800 dark:text-white/90">
+                          {notification.title}
+                        </span>
+                        {notification.description && (
+                          <span className="text-gray-500 dark:text-gray-400 ml-1">
+                            {notification.description}
+                          </span>
+                        )}
+                      </span>
+
+                      <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
+                        <span className="capitalize">{notification.type}</span>
+                        <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                        <span>{notification.relativeTime}</span>
+                        {notification.time !== notification.relativeTime && (
+                          <>
+                            <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                            <span>{notification.time}</span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </DropdownItem>
+                </Link>
+              </li>
+            ))
+          )}
         </ul>
-        <Link
-          href="/dashboard/notifications"
-          className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        >
-          View All Notifications
-        </Link>
+        {!isLoading && notifications.length > 0 && (
+          <Link
+            href="/dashboard/events"
+            className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            View All Events & Birthdays
+          </Link>
+        )}
       </Dropdown>
     </div>
   );

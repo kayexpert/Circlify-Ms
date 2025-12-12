@@ -177,6 +177,60 @@ export function useUpdateEvent() {
 }
 
 /**
+ * Hook to fetch upcoming events for notifications (next 7 days)
+ */
+export function useUpcomingEvents(daysAhead: number = 7) {
+  const { organization, isLoading: orgLoading } = useOrganization()
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: ["upcoming_events", organization?.id, daysAhead],
+    queryFn: async () => {
+      if (!organization?.id) return []
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const endDate = new Date(today)
+      endDate.setDate(endDate.getDate() + daysAhead)
+      endDate.setHours(23, 59, 59, 999)
+
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          id,
+          name,
+          description,
+          event_date,
+          end_date,
+          event_time,
+          location,
+          color,
+          event_types (
+            id,
+            name
+          )
+        `)
+        .eq("organization_id", organization.id)
+        .gte("event_date", today.toISOString().split("T")[0])
+        .lte("event_date", endDate.toISOString().split("T")[0])
+        .order("event_date", { ascending: true })
+        .order("event_time", { ascending: true })
+        .limit(50)
+
+      if (error) {
+        console.error("Error fetching upcoming events:", error)
+        throw error
+      }
+
+      return (data || []) as (Event & { event_types?: { id: string; name: string } | null })[]
+    },
+    enabled: !!organization?.id && !orgLoading,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
+/**
  * Hook to delete an event
  */
 export function useDeleteEvent() {

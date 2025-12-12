@@ -391,7 +391,7 @@ export function useDeleteReconciliation() {
       // Get reconciliation details first to unmark entries
       const { data: reconciliation } = await (supabase
         .from("finance_reconciliation_records") as any)
-        .select("*")
+        .select("id, reconciled_income_entries, reconciled_expenditure_entries")
         .eq("id", reconciliationId)
         .eq("organization_id", organization.id)
         .single()

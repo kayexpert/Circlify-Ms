@@ -79,6 +79,17 @@ export function formatDate(date: Date | string): string {
 }
 
 /**
+ * Format date for chart display (day and month only, no year)
+ */
+export function formatDateForChart(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date
+  const day = d.getDate().toString().padStart(2, "0")
+  const month = d.toLocaleString("default", { month: "short" })
+  const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1)
+  return `${day}-${capitalizedMonth}`
+}
+
+/**
  * Format currency
  */
 export function formatCurrency(amount: number): string {

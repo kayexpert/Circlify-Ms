@@ -25,6 +25,7 @@ export interface Member {
   digital_address?: string
   groups?: string[]
   departments?: string[]
+  roles?: string[]
   notes?: string
 }
 
@@ -95,6 +96,13 @@ export interface Department {
   description: string
   leader: string
   members: number
+  status: "Active" | "Inactive"
+}
+
+export interface RolePosition {
+  id: string
+  name: string
+  description: string
   status: "Active" | "Inactive"
 }
 

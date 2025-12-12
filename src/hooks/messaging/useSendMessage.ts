@@ -42,10 +42,10 @@ export function useSendMessage() {
       } = await supabase.auth.getUser()
       if (!user) throw new Error("User not authenticated")
 
-      // Get API configuration
+      // Get API configuration - only select needed fields
       const { data: apiConfig, error: apiConfigError } = await (supabase
         .from("messaging_api_configurations") as any)
-        .select("*")
+        .select("id, api_key, username, sender_id, is_active, organization_id")
         .eq("id", options.apiConfigId)
         .eq("organization_id", organization.id)
         .eq("is_active", true)
