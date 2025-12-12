@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DatePicker } from "@/components/ui/date-picker"
 import { toast } from "sonner"
+import { useOrganization } from "@/hooks/use-organization"
+import { getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 
 interface FormData {
   date: Date | undefined
@@ -52,6 +54,7 @@ export default function FinanceFormSheet({
   selectedRecord,
   onSubmit
 }: FinanceFormSheetProps) {
+  const { organization } = useOrganization()
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
@@ -105,7 +108,7 @@ export default function FinanceFormSheet({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (GH₵) *</Label>
+                  <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -180,7 +183,7 @@ export default function FinanceFormSheet({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (GH₵) *</Label>
+                  <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -243,7 +246,7 @@ export default function FinanceFormSheet({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="budgeted">Budgeted Amount (GH₵) *</Label>
+                  <Label htmlFor="budgeted">Budgeted Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="budgeted"
                     type="number"
@@ -301,7 +304,7 @@ export default function FinanceFormSheet({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="balance">Balance (GH₵) *</Label>
+                  <Label htmlFor="balance">Balance ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="balance"
                     type="number"
@@ -337,7 +340,7 @@ export default function FinanceFormSheet({
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="e.g., Church Building Loan"
+                    placeholder="e.g., Building Loan"
                     required
                   />
                 </div>
@@ -352,7 +355,7 @@ export default function FinanceFormSheet({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="totalAmount">Total Amount (GH₵) *</Label>
+                  <Label htmlFor="totalAmount">Total Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="totalAmount"
                     type="number"
@@ -364,7 +367,7 @@ export default function FinanceFormSheet({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="paidAmount">Paid Amount (GH₵)</Label>
+                  <Label htmlFor="paidAmount">Paid Amount ({getCurrencySymbol(organization?.currency || "USD")})</Label>
                   <Input
                     id="paidAmount"
                     type="number"

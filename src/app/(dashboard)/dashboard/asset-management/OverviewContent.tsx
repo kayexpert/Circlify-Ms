@@ -9,12 +9,15 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Edit, Archive, Search, Loader2 } from "lucide-react"
+import { Edit, Archive, Search } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 import { DatePicker } from "@/components/ui/date-picker"
 import { toast } from "sonner"
 import { useAssets } from "@/hooks/assets"
 import { useAssetCategories } from "@/hooks/assets"
 import { useCreateAsset, useUpdateAsset } from "@/hooks/assets"
+import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { Asset, AssetCategory } from "./types"
 import { formatDate } from "./utils"
 
@@ -27,6 +30,7 @@ export default function OverviewContent({
   onOpenDisposalDrawer,
   onNavigateToCategories,
 }: OverviewContentProps) {
+  const { organization } = useOrganization()
   const [statusFilter, setStatusFilter] = useState<"All" | "Available" | "Retired" | "Maintained" | "Disposed">("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
@@ -160,6 +164,10 @@ export default function OverviewContent({
       default:
         return ""
     }
+  }
+
+  if (isLoading) {
+    return <Loader text="Loading assets..." size="lg" />
   }
 
   return (
@@ -394,7 +402,7 @@ export default function OverviewContent({
                   {isLoading ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                        <Loader size="sm" />
                       </TableCell>
                     </TableRow>
                   ) : filteredAssets.length === 0 ? (
@@ -413,7 +421,7 @@ export default function OverviewContent({
                           <Badge variant="outline">{asset.condition}</Badge>
                         </TableCell>
                         <TableCell>{formatDate(asset.purchaseDate)}</TableCell>
-                        <TableCell>GH₵ {asset.value.toLocaleString()}</TableCell>
+                        <TableCell>{formatCurrency(asset.value, organization?.currency || "USD")}</TableCell>
                         <TableCell>
                           <Badge className={getStatusBadgeColor(asset.status)}>
                             {asset.status}

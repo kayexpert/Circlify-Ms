@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Edit, Trash2, Loader2 } from "lucide-react"
+import { Search, Plus, Edit, Trash2 } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 import { useProjects, useDeleteProject } from "@/hooks/projects"
 import { useProjectCategories } from "@/hooks/projects"
 import { createClient } from "@/lib/supabase/client"
@@ -139,11 +140,7 @@ export function ProjectsContent() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <Loader text="Loading projects..." size="lg" />
   }
 
   return (
@@ -207,19 +204,19 @@ export function ProjectsContent() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Estimated Budget</span>
                       <span className="text-sm font-semibold">
-                        {formatCurrency(project.estimated_budget, organization?.currency || "GHS")}
+                        {formatCurrency(project.estimated_budget, organization?.currency || "USD")}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Amount Raised</span>
                       <span className="text-sm font-semibold text-green-600">
-                        {formatCurrency(project.totalIncome || 0, organization?.currency || "GHS")}
+                        {formatCurrency(project.totalIncome || 0, organization?.currency || "USD")}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Budget Variance</span>
                       <span className={`text-sm font-semibold ${project.budgetVariance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {formatCurrency(project.budgetVariance || 0, organization?.currency || "GHS")}
+                        {formatCurrency(project.budgetVariance || 0, organization?.currency || "USD")}
                       </span>
                     </div>
                     <div className="flex gap-2 pt-2 border-t">

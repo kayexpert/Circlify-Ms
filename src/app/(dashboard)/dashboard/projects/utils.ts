@@ -54,15 +54,30 @@ export function validateAndConvertToUUID<T extends { id: number | string; uuid?:
   }
 }
 
-export function formatCurrency(amount: number, currency: string = "GHS"): string {
-  const currencySymbols: Record<string, string> = {
-    GHS: "GH₵",
-    USD: "$",
-    EUR: "€",
-    GBP: "£",
-  }
-  
-  const symbol = currencySymbols[currency] || currency
+const currencySymbols: Record<string, string> = {
+  GHS: "GH₵",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  CAD: "C$",
+  AUD: "A$",
+  NGN: "₦",
+  ZAR: "R",
+  KES: "KSh",
+  INR: "₹",
+  JPY: "¥",
+  CNY: "¥",
+}
+
+/**
+ * Get currency symbol for a given currency code
+ */
+export function getCurrencySymbol(currency: string = "USD"): string {
+  return currencySymbols[currency] || currency
+}
+
+export function formatCurrency(amount: number, currency: string = "USD"): string {
+  const symbol = getCurrencySymbol(currency)
   return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 

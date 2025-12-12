@@ -53,8 +53,11 @@ import {
 import { useMembers } from "@/hooks/members/useMembers"
 import { useGroups } from "@/hooks/members/useGroups"
 import { useDepartments } from "@/hooks/members/useDepartments"
+import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 
 export function MessagingPageClient() {
+  const { organization } = useOrganization()
   // Main tab state
   const [activeTab, setActiveTab] = useState("messages")
   
@@ -168,11 +171,11 @@ export function MessagingPageClient() {
       balanceLabel = "Balance (Error)"
     } else if (balance?.cashbalance !== undefined && balance.cashbalance !== null) {
       // Use cash balance from API (real data)
-      balanceValue = `GH₵ ${Number(balance.cashbalance).toFixed(2)}`
+      balanceValue = formatCurrency(Number(balance.cashbalance), organization?.currency || "USD")
     } else if (balance?.bundles?.SMS !== undefined && balance.bundles.SMS !== null) {
       // Convert SMS bundle count to estimated cash value (assuming GH₵0.10 per SMS)
       const estimatedCash = Number(balance.bundles.SMS) * 0.10
-      balanceValue = `~GH₵ ${estimatedCash.toFixed(2)} (${balance.bundles.SMS} SMS)`
+      balanceValue = `~${formatCurrency(estimatedCash, organization?.currency || "USD")} (${balance.bundles.SMS} SMS)`
       balanceLabel = "Estimated Balance (SMS Bundle)"
     } else if (activeApiConfig) {
       // API config exists but no balance data returned
@@ -200,7 +203,7 @@ export function MessagingPageClient() {
       },
       { 
         label: "Average Cost", 
-        value: `GH₵ ${avgCost.toFixed(2)}`, 
+        value: formatCurrency(avgCost, organization?.currency || "USD"), 
         icon: TrendingUp, 
         color: "text-purple-600", 
         bg: "bg-purple-50 dark:bg-purple-950" 
@@ -1805,7 +1808,7 @@ export function MessagingPageClient() {
               {viewingMessage.cost && (
                 <div>
                   <Label className="text-muted-foreground">Cost</Label>
-                  <p>GH₵ {viewingMessage.cost.toFixed(2)}</p>
+                  <p>{formatCurrency(viewingMessage.cost, organization?.currency || "USD")}</p>
                 </div>
               )}
             </div>

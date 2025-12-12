@@ -14,8 +14,10 @@ export function formatRecordDate(date: Date | string): string {
 }
 
 // Format currency amount
-export function formatCurrency(amount: number): string {
-  return `GH₵ ${amount.toLocaleString()}`
+import { formatCurrency as formatCurrencyUtil } from "@/app/(dashboard)/dashboard/projects/utils"
+
+export function formatCurrency(amount: number, currency: string = "USD"): string {
+  return formatCurrencyUtil(amount, currency)
 }
 
 // Truncate text with ellipsis

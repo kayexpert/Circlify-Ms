@@ -27,6 +27,7 @@ import { useMembersByStatus } from "@/hooks/members"
 import { useUpdateReconciliation } from "@/hooks/finance/useReconciliation"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 import { useQueryClient } from "@tanstack/react-query"
 
 interface ReconciliationDrawerProps {
@@ -515,7 +516,7 @@ export default function ReconciliationDrawer({
     // Validation: Check account balance
     const currentAccountData = accounts.find(a => a.id === reconciliation.accountId)
     if (currentAccountData && amount > currentAccountData.balance) {
-      toast.error(`Insufficient balance. Available balance: GH₵ ${currentAccountData.balance.toLocaleString()}`)
+      toast.error(`Insufficient balance. Available balance: ${formatCurrency(currentAccountData.balance, organization?.currency || "USD")}`)
       return
     }
 
@@ -861,13 +862,13 @@ export default function ReconciliationDrawer({
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground mb-1">Book Balance</p>
-                <p className="text-lg font-semibold">GH₵ {currentReconciliation.bookBalance.toLocaleString()}</p>
+                <p className="text-lg font-semibold">{formatCurrency(currentReconciliation.bookBalance, organization?.currency || "USD")}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground mb-1">Bank Balance</p>
-                <p className="text-lg font-semibold">GH₵ {currentReconciliation.bankBalance.toLocaleString()}</p>
+                <p className="text-lg font-semibold">{formatCurrency(currentReconciliation.bankBalance, organization?.currency || "USD")}</p>
               </CardContent>
             </Card>
             <Card>
@@ -875,7 +876,7 @@ export default function ReconciliationDrawer({
                 <p className="text-sm text-muted-foreground mb-1">Difference</p>
                 <p className={cn("text-lg font-semibold", getDifferenceColor(currentReconciliation.difference))}>
                   {currentReconciliation.difference > 0 ? "+" : ""}
-                  GH₵ {currentReconciliation.difference.toLocaleString()}
+                  {formatCurrency(currentReconciliation.difference, organization?.currency || "USD")}
                 </p>
               </CardContent>
             </Card>
@@ -976,7 +977,7 @@ export default function ReconciliationDrawer({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="income-amount">Amount (GH₵) *</Label>
+                        <Label htmlFor="income-amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                         <Input
                           id="income-amount"
                           type="number"
@@ -1078,7 +1079,7 @@ export default function ReconciliationDrawer({
                                 {entry.reference || "-"}
                               </TableCell>
                               <TableCell className="font-semibold text-green-600">
-                                GH₵ {entry.amount.toLocaleString()}
+                                {formatCurrency(entry.amount, organization?.currency || "USD")}
                               </TableCell>
                               <TableCell>
                                 {isReconciled ? (
@@ -1200,7 +1201,7 @@ export default function ReconciliationDrawer({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="expenditure-amount">Amount (GH₵) *</Label>
+                        <Label htmlFor="expenditure-amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                         <Input
                           id="expenditure-amount"
                           type="number"
@@ -1302,7 +1303,7 @@ export default function ReconciliationDrawer({
                                 {entry.description || "-"}
                               </TableCell>
                               <TableCell className="font-semibold text-red-600">
-                                GH₵ {entry.amount.toLocaleString()}
+                                {formatCurrency(entry.amount, organization?.currency || "USD")}
                               </TableCell>
                               <TableCell>
                                 {isReconciled ? (

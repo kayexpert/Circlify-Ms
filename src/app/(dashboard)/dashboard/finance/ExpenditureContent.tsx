@@ -21,6 +21,7 @@ import { useOrganization } from "@/hooks/use-organization"
 import { Pagination } from "@/components/ui/pagination"
 import type { ExpenditureRecord, Account } from "./types"
 import { formatDate } from "./utils"
+import { getCurrencySymbol, formatCurrency } from "@/app/(dashboard)/dashboard/projects/utils"
 
 export default function ExpenditureContent() {
   const { organization } = useOrganization()
@@ -283,13 +284,13 @@ export default function ExpenditureContent() {
       const balanceAfterRestore = selectedAccount.balance + oldAmount
       
       if (amount > balanceAfterRestore) {
-        toast.error(`Insufficient balance. Available balance: GH₵ ${balanceAfterRestore.toLocaleString()}`)
+        toast.error(`Insufficient balance. Available balance: ${formatCurrency(balanceAfterRestore, organization?.currency || "USD")}`)
         return
       }
     } else {
       // For new records, check current balance
       if (amount > (selectedAccount.balance || 0)) {
-        toast.error(`Insufficient balance. Available balance: GH₵ ${selectedAccount.balance?.toLocaleString() || 0}`)
+        toast.error(`Insufficient balance. Available balance: ${formatCurrency(selectedAccount.balance || 0, organization?.currency || "USD")}`)
         return
       }
     }
@@ -438,14 +439,14 @@ export default function ExpenditureContent() {
                   const selectedAccount = accounts.find((a: Account) => a.id.toString() === formData.account)
                   return selectedAccount ? (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Avail. Bal: GH₵ {selectedAccount.balance?.toLocaleString() || 0}
+                      Avail. Bal: {formatCurrency(selectedAccount.balance || 0, organization?.currency || "USD")}
                     </p>
                   ) : null
                 })()}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (GH₵) *</Label>
+                <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -510,7 +511,7 @@ export default function ExpenditureContent() {
                   <TableRow>
                     <TableHead className="bg-background/95 backdrop-blur">Date</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Category</TableHead>
-                    <TableHead className="bg-background/95 backdrop-blur">GH₵ Amt</TableHead>
+                    <TableHead className="bg-background/95 backdrop-blur">Amount ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Account</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Description</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Actions</TableHead>

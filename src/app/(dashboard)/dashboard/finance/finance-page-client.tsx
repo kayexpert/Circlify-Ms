@@ -61,7 +61,7 @@ const dummyLiabilities = [
     id: 1, 
     date: new Date("2024-01-01"), 
     category: "Loans", 
-    description: "Church Building Loan", 
+    description: "Building Loan", 
     creditor: "ABC Bank", 
     originalAmount: 500000, 
     amountPaid: 150000, 

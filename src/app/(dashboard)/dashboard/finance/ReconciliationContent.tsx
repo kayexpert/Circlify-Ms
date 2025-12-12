@@ -28,6 +28,7 @@ import { useCategoriesByType } from "@/hooks/finance/useCategories"
 import { useMembersByStatus } from "@/hooks/members"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 
 export default function ReconciliationContent() {
   // Hooks
@@ -331,7 +332,7 @@ export default function ReconciliationContent() {
               <div className="space-y-2">
                 <Label>Book Balance</Label>
                 <Input
-                  value={selectedAccount ? `GH₵ ${selectedAccount.balance.toLocaleString()}` : ""}
+                  value={selectedAccount ? formatCurrency(selectedAccount.balance, organization?.currency || "USD") : ""}
                   disabled
                   className="bg-muted"
                   placeholder="Select account to see balance"
@@ -366,7 +367,7 @@ export default function ReconciliationContent() {
                   value={(() => {
                     const bankBal = parseFloat(formData.bankBalance) || 0
                     const diff = bankBal - selectedAccount.balance
-                    return `GH₵ ${diff.toLocaleString()}`
+                    return formatCurrency(diff, organization?.currency || "USD")
                   })()}
                   disabled
                   className={cn(
@@ -469,11 +470,11 @@ export default function ReconciliationContent() {
                       <TableRow key={record.id}>
                         <TableCell>{formatDate(record.date)}</TableCell>
                         <TableCell className="font-medium">{record.accountName}</TableCell>
-                        <TableCell>GH₵ {record.bookBalance.toLocaleString()}</TableCell>
-                        <TableCell>GH₵ {record.bankBalance.toLocaleString()}</TableCell>
+                        <TableCell>{formatCurrency(record.bookBalance, organization?.currency || "USD")}</TableCell>
+                        <TableCell>{formatCurrency(record.bankBalance, organization?.currency || "USD")}</TableCell>
                         <TableCell className={cn("font-semibold", getDifferenceColor(record.difference))}>
                           {record.difference > 0 ? "+" : ""}
-                          GH₵ {record.difference.toLocaleString()}
+                          {formatCurrency(record.difference, organization?.currency || "USD")}
                         </TableCell>
                         <TableCell>
                           <Badge 

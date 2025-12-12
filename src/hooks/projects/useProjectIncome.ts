@@ -169,7 +169,7 @@ export function useCreateProjectIncome() {
             const projectName = (projectData as any)?.name || "the project"
 
             // Get template if configured
-            let messageText = `Thank you for your contribution of ${variables.amount?.toLocaleString() || 0} ${organization.currency || "GHS"} to ${projectName} on ${new Date(variables.date).toLocaleDateString()}. We appreciate your support!`
+            let messageText = `Thank you for your contribution of ${variables.amount?.toLocaleString() || 0} ${organization.currency || "USD"} to ${projectName} on ${new Date(variables.date).toLocaleDateString()}. We appreciate your support!`
             
             if ((notificationSettings as any).contribution_template_id) {
               const { data: template } = await supabase
@@ -185,7 +185,7 @@ export function useCreateProjectIncome() {
                   LastName: (member as any).last_name || "",
                   PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
                   Amount: (variables.amount || 0).toLocaleString(),
-                  Currency: organization.currency || "GHS",
+                  Currency: organization.currency || "USD",
                   Date: new Date(variables.date).toLocaleDateString(),
                   Category: projectName, // Use project name instead of category for project contributions
                   ProjectName: projectName,

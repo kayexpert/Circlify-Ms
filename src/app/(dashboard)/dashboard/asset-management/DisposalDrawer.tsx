@@ -14,6 +14,7 @@ import { useCreateAssetDisposal } from "@/hooks/assets"
 import { useAccounts } from "@/hooks/finance/useAccounts"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { Asset } from "./types"
 
 interface DisposalDrawerProps {
@@ -267,7 +268,7 @@ export default function DisposalDrawer({
             </div>
             {selectedAsset && (
               <p className="text-xs text-muted-foreground">
-                Original purchase value: GH₵ {selectedAsset.value.toLocaleString()}
+                Original purchase value: {formatCurrency(selectedAsset.value, organization?.currency || "USD")}
               </p>
             )}
 

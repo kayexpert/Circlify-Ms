@@ -89,7 +89,7 @@ export async function createOrganization(
     .insert({
       name: orgData.name,
       slug: orgData.slug,
-      type: orgData.type || 'church',
+      type: orgData.type || 'other',
       settings: orgData.settings || {},
     } as never)
     .select()

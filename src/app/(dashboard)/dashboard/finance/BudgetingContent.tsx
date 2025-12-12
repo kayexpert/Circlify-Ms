@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Edit, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { Budget } from "./types"
 
 interface BudgetingContentProps {
@@ -15,6 +17,7 @@ interface BudgetingContentProps {
 }
 
 export default function BudgetingContent({ budgets, setBudgets, onEdit }: BudgetingContentProps) {
+  const { organization } = useOrganization()
   const handleDelete = (id: number) => {
     setBudgets(budgets.filter(b => b.id !== id))
     toast.success("Budget deleted successfully")
@@ -41,19 +44,19 @@ export default function BudgetingContent({ budgets, setBudgets, onEdit }: Budget
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Total Budget</p>
-                <p className="text-2xl font-bold">GH₵{totalBudget.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalBudget, organization?.currency || "USD")}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Total Spent</p>
-                <p className="text-2xl font-bold text-orange-600">GH₵{totalSpent.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalSpent, organization?.currency || "USD")}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Remaining</p>
-                <p className="text-2xl font-bold text-green-600">GH₵{remaining.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(remaining, organization?.currency || "USD")}</p>
               </CardContent>
             </Card>
           </div>
@@ -86,10 +89,10 @@ export default function BudgetingContent({ budgets, setBudgets, onEdit }: Budget
                         <TableRow key={budget.id}>
                           <TableCell className="font-medium">{budget.category}</TableCell>
                           <TableCell>{budget.period}</TableCell>
-                          <TableCell>GH₵{budget.budgeted?.toLocaleString() || 0}</TableCell>
-                          <TableCell className="text-orange-600">GH₵{budget.spent?.toLocaleString() || 0}</TableCell>
+                          <TableCell>{formatCurrency(budget.budgeted || 0, organization?.currency || "USD")}</TableCell>
+                          <TableCell className="text-orange-600">{formatCurrency(budget.spent || 0, organization?.currency || "USD")}</TableCell>
                           <TableCell className={remaining >= 0 ? "text-green-600" : "text-red-600"}>
-                            GH₵{remaining.toLocaleString()}
+                            {formatCurrency(remaining, organization?.currency || "USD")}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

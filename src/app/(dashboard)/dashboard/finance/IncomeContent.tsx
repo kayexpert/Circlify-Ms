@@ -26,6 +26,7 @@ import { Pagination } from "@/components/ui/pagination"
 import type { IncomeRecord, Category, Account } from "./types"
 import type { Member as ComponentMember } from "@/app/(dashboard)/dashboard/members/types"
 import { formatDate } from "./utils"
+import { getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 
 export default function IncomeContent() {
   const { organization } = useOrganization()
@@ -486,7 +487,7 @@ export default function IncomeContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (GH₵) *</Label>
+                <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -551,7 +552,7 @@ export default function IncomeContent() {
                   <TableRow>
                     <TableHead className="bg-background/95 backdrop-blur">Date</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Category</TableHead>
-                    <TableHead className="bg-background/95 backdrop-blur">GH₵ Amt</TableHead>
+                    <TableHead className="bg-background/95 backdrop-blur">Amount ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Account</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Description</TableHead>
                     <TableHead className="bg-background/95 backdrop-blur">Actions</TableHead>

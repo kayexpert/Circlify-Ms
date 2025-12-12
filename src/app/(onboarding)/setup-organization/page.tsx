@@ -32,8 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 import { ORGANIZATION_TYPES, ORGANIZATION_SIZES, CURRENCIES } from "@/lib/constants";
 
 const organizationSchema = z.object({
@@ -45,8 +49,14 @@ const organizationSchema = z.object({
   location: z.string().optional(),
   country: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  email: z.union([
+    z.string().email("Invalid email address"),
+    z.literal(""),
+  ]).optional(),
+  website: z.union([
+    z.string().url("Invalid URL format"),
+    z.literal(""),
+  ]).optional(),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -55,6 +65,8 @@ export default function SetupOrganizationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [isChecking, setIsChecking] = useState(true);
+  const [currencyPopoverOpen, setCurrencyPopoverOpen] = useState(false);
+  const [currencySearchQuery, setCurrencySearchQuery] = useState("");
   const router = useRouter();
   const supabase = createClient();
 
@@ -106,7 +118,7 @@ export default function SetupOrganizationPage() {
       type: "",
       size: "",
       description: "",
-      currency: "USD",
+      currency: "",
       location: "",
       country: "",
       phone: "",
@@ -128,87 +140,206 @@ export default function SetupOrganizationPage() {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("User not authenticated");
+      if (userError || !user) {
+        const errorMsg = userError?.message || "User not authenticated";
+        if (process.env.NODE_ENV === "development") {
+          console.error("Auth error:", userError);
+        }
+        throw new Error(errorMsg);
+      }
+
+      // Ensure user record exists in users table (trigger should create it, but verify)
+      const { data: userRecord, error: userRecordError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (userRecordError && userRecordError.code !== "PGRST116") {
+        // PGRST116 means no rows found
+        if (process.env.NODE_ENV === "development") {
+          console.error("User record check error:", userRecordError);
+        }
+        throw new Error("User account not properly set up. Please try signing out and signing in again.");
+      }
+
+      if (!userRecord) {
+        // User record doesn't exist, create it
+        const { error: createUserError } = await supabase
+          .from("users")
+          .insert({
+            id: user.id,
+            email: user.email || "",
+            full_name: user.user_metadata?.full_name || null,
+          } as never);
+
+        if (createUserError) {
+          if (process.env.NODE_ENV === "development") {
+            console.error("Error creating user record:", createUserError);
+          }
+          throw new Error("Failed to set up user account. Please try again.");
+        }
+      }
 
       const slug = generateSlug(data.name);
 
-      // Check if slug already exists (will be empty due to RLS, which is fine)
+      // Validate slug is not empty
+      if (!slug || slug.trim().length === 0) {
+        throw new Error("Invalid organization name. Please enter a valid name.");
+      }
+
+      // Check if slug already exists
+      // Note: RLS might prevent seeing other orgs, but we check anyway
       const { data: existingOrg, error: slugCheckError } = await supabase
         .from("organizations")
         .select("id")
         .eq("slug", slug)
         .maybeSingle();
 
-      if (slugCheckError) {
-        console.error("Slug check error:", slugCheckError);
-        throw new Error(`Database error: ${slugCheckError.message}`);
+      if (slugCheckError && slugCheckError.code !== "PGRST116") {
+        // PGRST116 means no rows found, which is fine
+        if (process.env.NODE_ENV === "development") {
+          console.error("Slug check error:", slugCheckError);
+        }
+        throw new Error(`Unable to verify organization name: ${slugCheckError.message || "Database error"}`);
       }
 
       if (existingOrg) {
-        throw new Error("An organization with this name already exists");
+        throw new Error("An organization with this name already exists. Please choose a different name.");
       }
 
-      // Create organization - bypass type checking for Supabase insert
+      // Prepare organization data - convert empty strings to null
       const orgInsert = {
-        name: data.name,
+        name: data.name.trim(),
         slug: slug,
         type: data.type,
-        size: data.size,
-        description: data.description || null,
-        currency: data.currency,
-        location: data.location || null,
-        country: data.country || null,
-        phone: data.phone || null,
-        email: data.email || null,
-        website: data.website || null,
-        settings: {},
+        size: data.size || null,
+        description: (data.description?.trim() || null) as string | null,
+        currency: data.currency || "",
+        location: (data.location?.trim() || null) as string | null,
+        country: (data.country?.trim() || null) as string | null,
+        phone: (data.phone?.trim() || null) as string | null,
+        email: (data.email?.trim() || null) as string | null,
+        website: (data.website?.trim() || null) as string | null,
+        settings: {} as Record<string, unknown>,
       };
 
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .insert(orgInsert as never)
-        .select()
-        .single();
+      if (process.env.NODE_ENV === "development") {
+        console.log("Creating organization with user:", {
+          userId: user.id,
+          email: user.email,
+        });
+      }
 
-      if (orgError) throw orgError;
-      if (!org) throw new Error("Failed to create organization");
+      // Use the database function to create organization (bypasses RLS)
+      // This function handles organization creation, user linking, and created_by setting
+      const { data: orgData, error: orgError } = await supabase.rpc('create_organization', {
+        p_name: orgInsert.name,
+        p_slug: orgInsert.slug,
+        p_type: orgInsert.type,
+        p_size: orgInsert.size,
+        p_description: orgInsert.description,
+        p_currency: orgInsert.currency,
+        p_location: orgInsert.location,
+        p_country: orgInsert.country,
+        p_phone: orgInsert.phone,
+        p_email: orgInsert.email,
+        p_website: orgInsert.website,
+        p_settings: orgInsert.settings,
+      });
+
+      if (orgError) {
+        // Log full error details for debugging
+        if (process.env.NODE_ENV === "development") {
+          console.error("Organization creation error:", {
+            message: orgError.message || "Unknown error",
+            code: orgError.code || "Unknown code",
+            details: orgError.details || null,
+            hint: orgError.hint || null,
+            status: orgError.status || null,
+            fullError: JSON.stringify(orgError, Object.getOwnPropertyNames(orgError)),
+          });
+        }
+        
+        // Provide user-friendly error messages
+        let errorMessage = "Failed to create organization";
+        
+        // Check for RLS violation
+        if (orgError.message?.includes("row-level security") || orgError.message?.includes("RLS")) {
+          errorMessage = "Permission denied. Please ensure you are properly signed in and try again.";
+        } else if (orgError.code === "42501") {
+          // Insufficient privilege
+          errorMessage = "Permission denied. Please ensure you are properly signed in and try again.";
+        } else if (orgError.code === "23505") {
+          // Unique constraint violation
+          errorMessage = "An organization with this name or slug already exists. Please choose a different name.";
+        } else if (orgError.code === "23502") {
+          // Not null violation
+          errorMessage = "Required fields are missing. Please fill in all required fields.";
+        } else if (orgError.message) {
+          errorMessage = orgError.message;
+        } else if (orgError.details) {
+          errorMessage = orgError.details;
+        } else if (orgError.hint) {
+          errorMessage = orgError.hint;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // The RPC function returns an array (RETURNS TABLE), get the first result
+      const org = Array.isArray(orgData) && orgData.length > 0 ? orgData[0] : orgData;
+      
+      if (!org) {
+        throw new Error("Organization was not created. Please try again.");
+      }
 
       const orgId = (org as Record<string, unknown>).id as string;
 
-      // Link user as super_admin (organization creator)
-      const { error: linkError } = await supabase
-        .from("organization_users")
-        .insert({
-          organization_id: orgId,
-          user_id: user.id,
-          role: "super_admin" as const,
-        } as never);
+      if (!orgId) {
+        throw new Error("Failed to get organization ID. Please try again.");
+      }
 
-      if (linkError) throw linkError;
-
-      // Update organization to set created_by
-      await supabase
-        .from("organizations")
-        .update({ created_by: user.id } as never)
-        .eq("id", orgId);
+      // Note: The database function already links the user as super_admin and sets created_by
+      // So we don't need to do those steps here
 
       // Set as active organization
+      // Use upsert with user_id as conflict target (user_id is unique)
       const { error: sessionError } = await supabase
         .from("user_sessions")
         .upsert({
           user_id: user.id,
           organization_id: orgId,
-        } as never);
+        } as never, {
+          onConflict: "user_id",
+        });
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("Session creation error:", sessionError);
+        }
+        throw new Error(
+          sessionError.message || "Failed to create user session. Please try signing in again."
+        );
+      }
 
       toast.success("Organization created successfully!");
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create organization";
+      if (process.env.NODE_ENV === "development") {
+        console.error("Organization creation failed:", error);
+      }
+      
+      const message = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? String(error.message)
+        : "Failed to create organization. Please check all fields and try again.";
+      
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -230,144 +361,70 @@ export default function SetupOrganizationPage() {
   // Show loading while checking
   if (isChecking) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <Loader text="Checking organization..." size="lg" fullScreen />
     );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Side - Progress and Details */}
-        <div className="lg:w-1/3 w-full">
-          <Card className="sticky top-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-theme-md">
-            <CardHeader className="pb-4">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90 mb-2">
+    <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto sm:pt-10">
+        <div>
+          {/* Progress Section at Top */}
+          <div className="mb-8">
+            <div className="mb-4">
+              <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
                 Create Your Organization
-              </h2>
+              </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Step {step} of 2 — {step === 1 ? "Basic Information" : "Additional Details"}
               </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Progress Percentage */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-400">Progress</span>
-                <span className="text-sm font-semibold text-brand-500 dark:text-brand-400">{step * 50}%</span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="relative mb-2">
+              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${step * 50}%` }}
+                />
               </div>
 
-              {/* Progress Bar */}
-              <div className="relative">
-                <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              {/* Step Indicators */}
+              <div className="flex justify-between absolute -top-1 left-0 right-0">
+                {[1, 2].map((stepNum) => (
                   <div
-                    className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${step * 50}%` }}
-                  />
-                </div>
-
-                {/* Step Indicators */}
-                <div className="flex justify-between absolute -top-1 left-0 right-0">
-                  {[1, 2].map((stepNum) => (
-                    <div
-                      key={stepNum}
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
-                        stepNum <= step
-                          ? "bg-brand-500 border-brand-500"
-                          : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
-                      }`}
-                    >
-                      {stepNum < step ? (
-                        <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      ) : stepNum === step ? (
-                        <div className="w-1.5 h-1.5 bg-white rounded-full" />
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
+                    key={stepNum}
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                      stepNum <= step
+                        ? "bg-brand-500 border-brand-500"
+                        : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+                    }`}
+                  >
+                    {stepNum < step ? (
+                      <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : stepNum === step ? (
+                      <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                    ) : null}
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* Step Labels */}
-              <div className="flex justify-between pt-2">
-                <span className={`text-xs font-medium ${step >= 1 ? "text-brand-500 dark:text-brand-400" : "text-gray-400 dark:text-gray-600"}`}>
-                  Basic Info
-                </span>
-                <span className={`text-xs font-medium ${step >= 2 ? "text-brand-500 dark:text-brand-400" : "text-gray-400 dark:text-gray-600"}`}>
-                  Details
-                </span>
-              </div>
+            {/* Step Labels */}
+            <div className="flex justify-between pt-2">
+              <span className={`text-xs font-medium ${step >= 1 ? "text-brand-500 dark:text-brand-400" : "text-gray-400 dark:text-gray-600"}`}>
+                Basic Info
+              </span>
+              <span className={`text-xs font-medium ${step >= 2 ? "text-brand-500 dark:text-brand-400" : "text-gray-400 dark:text-gray-600"}`}>
+                Details
+              </span>
+            </div>
+          </div>
 
-              {/* Step Details */}
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90 mb-3">
-                  What you&apos;ll need:
-                </h3>
-                <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                  {step === 1 ? (
-                    <>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-brand-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Organization name</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-brand-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Organization type</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-brand-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Organization size</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-gray-300 dark:text-gray-700 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-gray-400 dark:text-gray-600">Additional details (optional)</span>
-                      </li>
-                    </>
-                  ) : (
-                    <>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-brand-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Organization description</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-brand-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Contact information</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-4 h-4 mt-0.5 text-gray-300 dark:text-gray-700 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-gray-400 dark:text-gray-600">Website (optional)</span>
-                      </li>
-                    </>
-                  )}
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Side - Form */}
-        <div className="lg:w-2/3 w-full">
-          <Card className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-theme-md">
-            <CardContent className="p-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {step === 1 && (
               <>
                 <FormField
@@ -378,7 +435,7 @@ export default function SetupOrganizationPage() {
                       <FormLabel>Organization Name *</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Grace Community Church"
+                          placeholder="Enter organization name"
                           {...field}
                         />
                       </FormControl>
@@ -455,32 +512,80 @@ export default function SetupOrganizationPage() {
                 <FormField
                   control={form.control}
                   name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Default Currency *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {CURRENCIES.map((currency) => (
-                            <SelectItem key={currency.value} value={currency.value}>
-                              {currency.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        This will be used for all financial transactions
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const selectedCurrency = CURRENCIES.find((c) => c.value === field.value);
+                    const filteredCurrencies = CURRENCIES.filter((currency) =>
+                      currency.label.toLowerCase().includes(currencySearchQuery.toLowerCase()) ||
+                      currency.value.toLowerCase().includes(currencySearchQuery.toLowerCase())
+                    );
+
+                    return (
+                      <FormItem>
+                        <FormLabel>Default Currency *</FormLabel>
+                        <Popover open={currencyPopoverOpen} onOpenChange={setCurrencyPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={currencyPopoverOpen}
+                                className="w-full justify-between"
+                              >
+                                {selectedCurrency ? selectedCurrency.label : "Select currency..."}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Search currencies..."
+                                value={currencySearchQuery}
+                                onChange={(e) => setCurrencySearchQuery(e.target.value)}
+                                className="h-9"
+                              />
+                            </div>
+                            <ScrollArea className="h-[200px]">
+                              <div className="p-1">
+                                {filteredCurrencies.length === 0 ? (
+                                  <div className="py-6 text-center text-sm text-muted-foreground">
+                                    No currencies found.
+                                  </div>
+                                ) : (
+                                  filteredCurrencies.map((currency) => (
+                                    <div
+                                      key={currency.value}
+                                      className={cn(
+                                        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                        field.value === currency.value && "bg-accent"
+                                      )}
+                                      onClick={() => {
+                                        field.onChange(currency.value);
+                                        setCurrencyPopoverOpen(false);
+                                        setCurrencySearchQuery("");
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.value === currency.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span>{currency.label}</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>
+                          This will be used for all financial transactions
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <Button type="button" onClick={nextStep} className="w-full">
@@ -599,27 +704,25 @@ export default function SetupOrganizationPage() {
                   )}
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 justify-between items-center">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={prevStep}
-                    className="w-full"
                     disabled={isLoading}
+                    size="sm"
                   >
                     Previous
                   </Button>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button type="submit" disabled={isLoading} size="sm">
+                    {isLoading && <Loader className="mr-2 h-4 w-4" size="sm" />}
                     Create Organization
                   </Button>
                 </div>
               </>
             )}
-          </form>
-        </Form>
-            </CardContent>
-          </Card>
+            </form>
+          </Form>
         </div>
       </div>
     </div>

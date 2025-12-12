@@ -23,10 +23,12 @@ import { useExpenditureRecords } from "@/hooks/finance"
 import { useTransfers, useCreateTransfer } from "@/hooks/finance"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { FinanceAccount } from "@/types/database-extension"
 import type { Account, TransferRecord } from "./types"
 
 export default function AccountsContent() {
+  const { organization } = useOrganization()
   const [activeTab, setActiveTab] = useState<"overview" | "transfer">("overview")
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isEditFormOpen, setIsEditFormOpen] = useState(false)
@@ -36,7 +38,6 @@ export default function AccountsContent() {
   const [accountToEdit, setAccountToEdit] = useState<Account | null>(null)
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null)
   
-  const { organization } = useOrganization()
   const supabase = createClient()
 
   // Fetch data using hooks
@@ -319,7 +320,7 @@ export default function AccountsContent() {
             },
             accountId: accountUUID,
           })
-          toast.success(`Account created and opening balance of GH₵ ${openingBalance.toLocaleString()} recorded`)
+          toast.success(`Account created and opening balance of ${formatCurrency(openingBalance, organization?.currency || "USD")} recorded`)
         }
       }
 
@@ -489,7 +490,7 @@ export default function AccountsContent() {
                           <div>
                             <p className="text-sm text-muted-foreground mb-1">Balance</p>
                             <p className="text-2xl font-bold">
-                              GH₵{(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatCurrency(account.balance || 0, organization?.currency || "USD")}
                             </p>
                           </div>
                           
@@ -980,7 +981,7 @@ export default function AccountsContent() {
                                 : "text-red-600"
                             }`}>
                               {transaction.type === "expenditure" || transaction.type === "transfer_out" ? "-" : "+"}
-                              GH₵ {transaction.amount.toLocaleString()}
+                              {formatCurrency(transaction.amount, organization?.currency || "USD")}
                             </TableCell>
                           </TableRow>
                         ))
@@ -1085,7 +1086,7 @@ function TransferTab() {
     }
 
     if (fromAccount.balance < amount) {
-      toast.error(`Insufficient balance. Available: GH₵ ${fromAccount.balance.toLocaleString()}`)
+      toast.error(`Insufficient balance. Available: ${formatCurrency(fromAccount.balance, organization?.currency || "USD")}`)
       return
     }
 
@@ -1163,7 +1164,7 @@ function TransferTab() {
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} (GH₵ {account.balance.toLocaleString()})
+                      {account.name} ({formatCurrency(account.balance, organization?.currency || "USD")})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1185,7 +1186,7 @@ function TransferTab() {
                     .filter(acc => acc.id.toString() !== formData.fromAccount)
                     .map((account) => (
                       <SelectItem key={account.id} value={account.id.toString()}>
-                        {account.name} (GH₵ {account.balance.toLocaleString()})
+                        {account.name} ({formatCurrency(account.balance, organization?.currency || "USD")})
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -1194,7 +1195,7 @@ function TransferTab() {
 
             {/* Amount */}
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount (GH₵) *</Label>
+              <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
               <Input
                 id="amount"
                 type="number"
@@ -1274,7 +1275,7 @@ function TransferTab() {
                         <TableCell>{formatDate(transfer.date)}</TableCell>
                         <TableCell>{transfer.fromAccountName}</TableCell>
                         <TableCell>{transfer.toAccountName}</TableCell>
-                        <TableCell className="font-bold">GH₵ {transfer.amount.toLocaleString()}</TableCell>
+                        <TableCell className="font-bold">{formatCurrency(transfer.amount, organization?.currency || "USD")}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {transfer.description}
                         </TableCell>

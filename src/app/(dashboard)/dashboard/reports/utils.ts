@@ -92,8 +92,10 @@ export function formatDateForChart(date: Date | string): string {
 /**
  * Format currency
  */
-export function formatCurrency(amount: number): string {
-  return `GH₵ ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+import { formatCurrency as formatCurrencyUtil } from "@/app/(dashboard)/dashboard/projects/utils"
+
+export function formatCurrency(amount: number, currency: string = "USD"): string {
+  return formatCurrencyUtil(amount, currency)
 }
 
 /**

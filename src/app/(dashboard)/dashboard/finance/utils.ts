@@ -1,5 +1,7 @@
 // Finance Module Utility Functions
 
+import { formatCurrency as formatCurrencyUtil } from "@/app/(dashboard)/dashboard/projects/utils"
+
 export function formatDate(date: Date): string {
   const day = date.getDate().toString().padStart(2, "0")
   const month = date.toLocaleString("default", { month: "short" })
@@ -8,6 +10,6 @@ export function formatDate(date: Date): string {
   return `${day}-${capitalizedMonth}-${year}`
 }
 
-export function formatCurrency(amount: number): string {
-  return `GH₵ ${amount.toLocaleString()}`
+export function formatCurrency(amount: number, currency: string = "USD"): string {
+  return formatCurrencyUtil(amount, currency)
 }

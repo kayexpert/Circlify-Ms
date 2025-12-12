@@ -20,6 +20,7 @@ import { useAccounts } from "@/hooks/finance/useAccounts"
 import { useCreateExpenditureRecord } from "@/hooks/finance/useExpenditureRecords"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
+import { getCurrencySymbol, formatCurrency } from "@/app/(dashboard)/dashboard/projects/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { Pagination } from "@/components/ui/pagination"
 import type { FinanceLiability } from "@/types/database-extension"
@@ -337,7 +338,7 @@ export default function LiabilitiesContent() {
         return
       }
       if (amountPaid > selectedAccount.balance) {
-        toast.error(`Insufficient balance. Available balance: GH₵ ${selectedAccount.balance.toLocaleString()}`)
+        toast.error(`Insufficient balance. Available balance: ${formatCurrency(selectedAccount.balance, organization?.currency || "USD")}`)
         return
       }
     }
@@ -521,13 +522,13 @@ export default function LiabilitiesContent() {
     
     // Validation: Payment amount cannot exceed account balance
     if (paymentAmount > selectedAccount.balance) {
-      toast.error(`Insufficient balance. Available balance: GH₵ ${selectedAccount.balance.toLocaleString()}`)
+      toast.error(`Insufficient balance. Available balance: ${formatCurrency(selectedAccount.balance, organization?.currency || "USD")}`)
       return
     }
     
     // Validation: Payment amount cannot exceed liability balance
     if (paymentAmount > selectedLiabilityForPayment.balance) {
-      toast.error(`Payment cannot exceed liability balance of GH₵ ${selectedLiabilityForPayment.balance.toLocaleString()}`)
+      toast.error(`Payment cannot exceed liability balance of ${formatCurrency(selectedLiabilityForPayment.balance, organization?.currency || "USD")}`)
       return
     }
     
@@ -770,7 +771,7 @@ export default function LiabilitiesContent() {
               {/* Row 5: Amount and Paid Amount */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (GH₵) *</Label>
+                  <Label htmlFor="amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -782,7 +783,7 @@ export default function LiabilitiesContent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="paidAmount">Paid Amount (GH₵)</Label>
+                  <Label htmlFor="paidAmount">Paid Amount ({getCurrencySymbol(organization?.currency || "USD")})</Label>
                   <Input
                     id="paidAmount"
                     type="number"
@@ -831,11 +832,11 @@ export default function LiabilitiesContent() {
                     return selectedAccount ? (
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">
-                          Available Balance: GH₵ {selectedAccount.balance?.toLocaleString() || 0}
+                          Available Balance: {formatCurrency(selectedAccount.balance || 0, organization?.currency || "USD")}
                         </p>
                         {paymentAmount > selectedAccount.balance && (
                           <p className="text-xs text-red-600">
-                            Insufficient balance. Available: GH₵ {selectedAccount.balance?.toLocaleString() || 0}
+                            Insufficient balance. Available: {formatCurrency(selectedAccount.balance || 0, organization?.currency || "USD")}
                           </p>
                         )}
                       </div>
@@ -885,9 +886,9 @@ export default function LiabilitiesContent() {
                       <TableHead>Category</TableHead>
                       <TableHead>Creditor</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Original Amt (GH₵)</TableHead>
-                      <TableHead>Amt Paid (GH₵)</TableHead>
-                      <TableHead>Balance (GH₵)</TableHead>
+                      <TableHead>Original Amount ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
+                      <TableHead>Amount Paid ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
+                      <TableHead>Balance ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -1013,7 +1014,7 @@ export default function LiabilitiesContent() {
 
             {/* Amount - Pre-filled but editable */}
             <div className="space-y-2">
-              <Label htmlFor="payment-amount">Amount (GH₵) *</Label>
+              <Label htmlFor="payment-amount">Amount ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
               <Input
                 id="payment-amount"
                 type="number"
@@ -1025,7 +1026,7 @@ export default function LiabilitiesContent() {
               />
               {selectedLiabilityForPayment && (
                 <p className="text-xs text-muted-foreground">
-                  Liability balance: GH₵ {selectedLiabilityForPayment.balance.toLocaleString()}
+                  Liability balance: {formatCurrency(selectedLiabilityForPayment.balance, organization?.currency || "USD")}
                 </p>
               )}
             </div>
@@ -1074,7 +1075,7 @@ export default function LiabilitiesContent() {
                 const selectedAccount = accounts.find(a => a.id.toString() === paymentFormData.account)
                 return selectedAccount ? (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Available Balance: GH₵ {selectedAccount.balance?.toLocaleString() || 0}
+                    Available Balance: {formatCurrency(selectedAccount.balance || 0, organization?.currency || "USD")}
                   </p>
                 ) : null
               })()}
@@ -1141,11 +1142,11 @@ export default function LiabilitiesContent() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Original Amount</p>
-                      <p className="text-lg font-bold">GH₵ {displayLiability.originalAmount.toLocaleString()}</p>
+                      <p className="text-lg font-bold">{formatCurrency(displayLiability.originalAmount, organization?.currency || "USD")}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Remaining Balance</p>
-                      <p className="text-lg font-bold text-red-600">GH₵ {remainingBalance.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-red-600">{formatCurrency(remainingBalance, organization?.currency || "USD")}</p>
                     </div>
                   </div>
                 </div>
@@ -1200,11 +1201,11 @@ export default function LiabilitiesContent() {
                           <TableRow key={payment.id}>
                             <TableCell>{formatDate(payment.date)}</TableCell>
                             <TableCell className="font-bold text-green-600">
-                              GH₵ {payment.amount.toLocaleString()}
+                              {formatCurrency(payment.amount, organization?.currency || "USD")}
                             </TableCell>
                             <TableCell>{payment.account || "N/A"}</TableCell>
                             <TableCell className="text-red-600">
-                              GH₵ {remainingAfterPayment.toLocaleString()}
+                              {formatCurrency(remainingAfterPayment, organization?.currency || "USD")}
                             </TableCell>
                           </TableRow>
                         )

@@ -1,11 +1,19 @@
 "use client"
 
+import { useState, useMemo } from "react"
+import { useOrganization } from "@/hooks/use-organization"
+import { getOrganizationTypeLabelLowercase } from "@/lib/utils/organization"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { ChevronDown, Check } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { CURRENCIES, ORGANIZATION_TYPES } from "@/lib/constants"
 
 interface GeneralSettingsTabProps {
   settings: {
@@ -33,11 +41,23 @@ export function GeneralSettingsTab({
   onSave,
   isSaving,
 }: GeneralSettingsTabProps) {
+  const { organization } = useOrganization()
+  const [currencyPopoverOpen, setCurrencyPopoverOpen] = useState(false)
+  const [currencySearchQuery, setCurrencySearchQuery] = useState("")
+
+  const selectedCurrency = CURRENCIES.find((c) => c.value === settings.currency)
+  const filteredCurrencies = useMemo(() => {
+    return CURRENCIES.filter((currency) =>
+      currency.label.toLowerCase().includes(currencySearchQuery.toLowerCase()) ||
+      currency.value.toLowerCase().includes(currencySearchQuery.toLowerCase())
+    )
+  }, [currencySearchQuery])
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Organization Information</CardTitle>
-        <CardDescription>Basic information about your organization</CardDescription>
+        <CardDescription>Basic information about your {getOrganizationTypeLabelLowercase(organization?.type)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
@@ -73,10 +93,11 @@ export function GeneralSettingsTab({
                 <SelectValue placeholder="Select organization type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="church">Church</SelectItem>
-                <SelectItem value="ministry">Ministry</SelectItem>
-                <SelectItem value="nonprofit">Non-Profit</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                {ORGANIZATION_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -165,21 +186,61 @@ export function GeneralSettingsTab({
           </div>
           <div className="space-y-2">
             <Label htmlFor="currency">Currency</Label>
-            <Select
-              value={settings.currency}
-              onValueChange={(value) => onSettingsChange({ ...settings, currency: value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
-                <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                <SelectItem value="USD">USD - US Dollar</SelectItem>
-                <SelectItem value="EUR">EUR - Euro</SelectItem>
-                <SelectItem value="GBP">GBP - British Pound</SelectItem>
-              </SelectContent>
-            </Select>
+            <Popover open={currencyPopoverOpen} onOpenChange={setCurrencyPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={currencyPopoverOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedCurrency ? selectedCurrency.label : "Select currency..."}
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input
+                    placeholder="Search currencies..."
+                    value={currencySearchQuery}
+                    onChange={(e) => setCurrencySearchQuery(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-1">
+                    {filteredCurrencies.length === 0 ? (
+                      <div className="py-6 text-center text-sm text-muted-foreground">
+                        No currencies found.
+                      </div>
+                    ) : (
+                      filteredCurrencies.map((currency) => (
+                        <div
+                          key={currency.value}
+                          className={cn(
+                            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                            settings.currency === currency.value && "bg-accent"
+                          )}
+                          onClick={() => {
+                            onSettingsChange({ ...settings, currency: currency.value })
+                            setCurrencyPopoverOpen(false)
+                            setCurrencySearchQuery("")
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              settings.currency === currency.value ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span>{currency.label}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

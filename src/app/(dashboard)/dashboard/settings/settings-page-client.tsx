@@ -33,7 +33,7 @@ export function SettingsPageClient() {
     role: "member",
   })
 
-  const [churchSettings, setChurchSettings] = useState({
+  const [organizationSettings, setOrganizationSettings] = useState({
     name: "",
     slug: "",
     type: "",
@@ -45,7 +45,7 @@ export function SettingsPageClient() {
     country: "",
     website: "",
     logo_url: "",
-    currency: "GHS",
+    currency: "",
   })
 
   const [profileData, setProfileData] = useState({
@@ -94,7 +94,7 @@ export function SettingsPageClient() {
   // Populate organization settings when loaded
   useEffect(() => {
     if (organization) {
-      setChurchSettings({
+      setOrganizationSettings({
         name: organization.name || "",
         slug: organization.slug || "",
         type: organization.type || "",
@@ -106,7 +106,7 @@ export function SettingsPageClient() {
         country: organization.country || "",
         website: organization.website || "",
         logo_url: organization.logo_url || "",
-        currency: organization.currency || "GHS",
+        currency: organization.currency || "",
       })
     }
   }, [organization])
@@ -212,7 +212,7 @@ export function SettingsPageClient() {
     }
   }
 
-  const handleSaveChurchSettings = async () => {
+  const handleSaveOrganizationSettings = async () => {
     if (!organization) {
       toast.error("Organization not found")
       return
@@ -222,23 +222,23 @@ export function SettingsPageClient() {
     try {
       // Prepare update data
       const updateData: any = {
-        name: churchSettings.name,
+        name: organizationSettings.name,
       }
 
       // Add optional fields
-      if (churchSettings.email !== undefined) updateData.email = churchSettings.email || null
-      if (churchSettings.phone !== undefined) updateData.phone = churchSettings.phone || null
-      if (churchSettings.location !== undefined)
-        updateData.location = churchSettings.location || null
-      if (churchSettings.country !== undefined) updateData.country = churchSettings.country || null
-      if (churchSettings.website !== undefined) updateData.website = churchSettings.website || null
-      if (churchSettings.logo_url !== undefined)
-        updateData.logo_url = churchSettings.logo_url || null
-      if (churchSettings.currency !== undefined) updateData.currency = churchSettings.currency
-      if (churchSettings.type !== undefined) updateData.type = churchSettings.type || null
-      if (churchSettings.size !== undefined) updateData.size = churchSettings.size || null
-      if (churchSettings.description !== undefined)
-        updateData.description = churchSettings.description || null
+      if (organizationSettings.email !== undefined) updateData.email = organizationSettings.email || null
+      if (organizationSettings.phone !== undefined) updateData.phone = organizationSettings.phone || null
+      if (organizationSettings.location !== undefined)
+        updateData.location = organizationSettings.location || null
+      if (organizationSettings.country !== undefined) updateData.country = organizationSettings.country || null
+      if (organizationSettings.website !== undefined) updateData.website = organizationSettings.website || null
+      if (organizationSettings.logo_url !== undefined)
+        updateData.logo_url = organizationSettings.logo_url || null
+      if (organizationSettings.currency !== undefined) updateData.currency = organizationSettings.currency
+      if (organizationSettings.type !== undefined) updateData.type = organizationSettings.type || null
+      if (organizationSettings.size !== undefined) updateData.size = organizationSettings.size || null
+      if (organizationSettings.description !== undefined)
+        updateData.description = organizationSettings.description || null
 
       // Use API route to update organization (handles permissions properly)
       const response = await fetch("/api/organizations/update", {
@@ -270,7 +270,7 @@ export function SettingsPageClient() {
       const updatedOrg = result.organization
 
       // Update local state immediately with the returned data
-      setChurchSettings({
+      setOrganizationSettings({
         name: updatedOrg.name || "",
         slug: updatedOrg.slug || "",
         type: updatedOrg.type || "",
@@ -282,7 +282,7 @@ export function SettingsPageClient() {
         country: updatedOrg.country || "",
         website: updatedOrg.website || "",
         logo_url: updatedOrg.logo_url || "",
-        currency: updatedOrg.currency || "GHS",
+        currency: updatedOrg.currency || "",
       })
 
       // Refresh organization data to get the latest from database
@@ -444,9 +444,9 @@ export function SettingsPageClient() {
         {/* General Settings */}
         <TabsContent value="general" className="space-y-4">
           <GeneralSettingsTab
-            settings={churchSettings}
-            onSettingsChange={setChurchSettings}
-            onSave={handleSaveChurchSettings}
+            settings={organizationSettings}
+            onSettingsChange={setOrganizationSettings}
+            onSave={handleSaveOrganizationSettings}
             isSaving={isSaving}
           />
         </TabsContent>

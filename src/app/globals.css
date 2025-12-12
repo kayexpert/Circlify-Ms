@@ -894,12 +894,47 @@ select:disabled {
 
 /* Loader animation - CSS-based three-bar loader */
 .loader {
-    --c: no-repeat linear-gradient(hsl(var(--primary)) 0 0);
+    display: block;
+    width: 45px;
+    aspect-ratio: .75;
+    min-height: 30px;
+    --c: no-repeat linear-gradient(#000 0 0);
     background: 
         var(--c) 0%   50%,
         var(--c) 50%  50%,
         var(--c) 100% 50%;
+    background-size: 20% 50%, 20% 50%, 20% 50%;
     animation: l7 1s infinite linear alternate;
+    /* Smooth appearance */
+    animation-fill-mode: both;
+    will-change: background-size;
+}
+
+/* Override width when Tailwind width classes are applied */
+.loader.w-\[20px\] {
+    width: 20px;
+}
+
+.loader.w-\[35px\] {
+    width: 35px;
+}
+
+.loader.w-\[50px\] {
+    width: 50px;
+}
+
+/* Dark mode support for loader */
+.dark .loader {
+    --c: no-repeat linear-gradient(#fff 0 0);
+}
+
+/* Prevent layout shift for loader containers */
+.loader-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 400px !important;
 }
 
 @keyframes l7 {

@@ -301,7 +301,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Estimated Budget</p>
                   <p className="text-2xl font-bold mt-1">
-                    {formatCurrency(project.estimated_budget, organization?.currency || "GHS")}
+                    {formatCurrency(project.estimated_budget, organization?.currency || "USD")}
                   </p>
                 </div>
               </CardContent>
@@ -313,7 +313,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Income</p>
                     <p className="text-2xl font-bold mt-1 text-green-600">
-                      {formatCurrency(totals.totalIncome, organization?.currency || "GHS")}
+                      {formatCurrency(totals.totalIncome, organization?.currency || "USD")}
                     </p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-green-600" />
@@ -327,7 +327,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Expenditure</p>
                     <p className="text-2xl font-bold mt-1 text-red-600">
-                      {formatCurrency(totals.totalExpenditure, organization?.currency || "GHS")}
+                      {formatCurrency(totals.totalExpenditure, organization?.currency || "USD")}
                     </p>
                   </div>
                   <TrendingDown className="h-8 w-8 text-red-600" />
@@ -343,7 +343,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Budget Variance</p>
                   <p className={`text-xl font-semibold mt-1 ${totals.budgetVariance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {formatCurrency(totals.budgetVariance, organization?.currency || "GHS")}
+                    {formatCurrency(totals.budgetVariance, organization?.currency || "USD")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {totals.budgetVariance >= 0 ? "Under budget" : "Over budget"}
@@ -649,7 +649,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                             <TableRow key={record.id}>
                               <TableCell>{formatDate(record.date)}</TableCell>
                               <TableCell className="font-semibold text-green-600">
-                                {formatCurrency(Number(record.amount), organization?.currency || "GHS")}
+                                {formatCurrency(Number(record.amount), organization?.currency || "USD")}
                               </TableCell>
                               <TableCell>
                                 {(() => {
@@ -898,7 +898,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                             <TableRow key={record.id}>
                               <TableCell>{formatDate(record.date)}</TableCell>
                               <TableCell className="font-semibold text-red-600">
-                                {formatCurrency(Number(record.amount), organization?.currency || "GHS")}
+                                {formatCurrency(Number(record.amount), organization?.currency || "USD")}
                               </TableCell>
                               <TableCell>
                                 {accounts.find((a) => a.uuid === record.account_id)?.name || "N/A"}

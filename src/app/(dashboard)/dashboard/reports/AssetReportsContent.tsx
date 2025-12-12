@@ -8,6 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Download, Package, DollarSign, TrendingUp, ArrowUpRight } from "lucide-react"
 import { useAssets } from "@/hooks/assets"
 import { useAssetDisposals } from "@/hooks/assets"
+import { useOrganization } from "@/hooks/use-organization"
 import type { PeriodType, DateRange, AssetSummary } from "./types"
 import { getDateRangeForPeriod, formatCurrency, formatDate, formatNumber, generateCSV, downloadCSV } from "./utils"
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
@@ -15,6 +16,8 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00ff00", "#ff00ff"]
 
 export default function AssetReportsContent() {
+  const { organization } = useOrganization()
+  const currency = organization?.currency || "USD"
   const [period, setPeriod] = useState<PeriodType>("month")
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
 
@@ -181,7 +184,7 @@ export default function AssetReportsContent() {
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summary.totalAssetValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(summary.totalAssetValue, currency)}</div>
             <div className="text-xs text-muted-foreground mt-1">Combined value</div>
           </CardContent>
         </Card>
@@ -192,7 +195,7 @@ export default function AssetReportsContent() {
             <TrendingUp className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summary.averageAssetValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(summary.averageAssetValue, currency)}</div>
             <div className="text-xs text-muted-foreground mt-1">Per asset</div>
           </CardContent>
         </Card>
@@ -204,7 +207,7 @@ export default function AssetReportsContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(summary.disposalsThisPeriod)}</div>
-            <div className="text-xs text-muted-foreground mt-1">{formatCurrency(summary.disposalValue)} value</div>
+            <div className="text-xs text-muted-foreground mt-1">{formatCurrency(summary.disposalValue, currency)} value</div>
           </CardContent>
         </Card>
       </div>
@@ -224,7 +227,7 @@ export default function AssetReportsContent() {
                 <XAxis dataKey="category" angle={-45} textAnchor="end" height={100} />
                 <YAxis yAxisId="left" />
                 <YAxis yAxisId="right" orientation="right" />
-                <Tooltip formatter={(value: number, name: string) => (name === "value" ? formatCurrency(value) : formatNumber(value))} />
+                <Tooltip formatter={(value: number, name: string) => (name === "value" ? formatCurrency(value, currency) : formatNumber(value))} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="count" fill="#8884d8" name="Count" />
                 <Bar yAxisId="right" dataKey="value" fill="#82ca9d" name="Value" />
@@ -293,7 +296,7 @@ export default function AssetReportsContent() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="status" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
                 <Bar dataKey="value" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -314,7 +317,7 @@ export default function AssetReportsContent() {
                   <div>
                     <span className="text-sm font-medium">{item.category}</span>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {formatNumber(item.count)} assets | {formatCurrency(item.value)} value
+                      {formatNumber(item.count)} assets | {formatCurrency(item.value, currency)} value
                     </div>
                   </div>
                 </div>

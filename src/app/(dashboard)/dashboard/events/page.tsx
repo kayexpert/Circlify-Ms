@@ -3,7 +3,7 @@ import { EventsPageClient } from "./events-page-client"
 
 export const metadata: Metadata = {
   title: "Events",
-  description: "Manage church events and activities",
+  description: "Manage organization events and activities",
 }
 
 export default function EventsPage() {

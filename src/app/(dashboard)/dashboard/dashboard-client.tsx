@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo, Suspense } from "react"
+import { useState, useEffect, useMemo, useRef, Suspense } from "react"
+import { useQueriesCompletion, isQueryComplete } from "@/hooks/use-query-completion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, UserPlus, DollarSign, Calendar, TrendingUp, TrendingDown, Cake, ArrowRight } from "lucide-react"
@@ -14,6 +15,10 @@ import { useMemberStatistics, useUpcomingBirthdays, useRecentMembers, useMemberG
 import { useFinanceOverview, useFinanceMonthlyTrends } from "@/hooks/finance/useFinanceStatistics"
 import { useEvents } from "@/hooks/events"
 import { useVisitorsPaginated } from "@/hooks/members/useVisitors"
+import { useOrganization } from "@/hooks/use-organization"
+import { usePageLoading } from "@/contexts/page-loading-context"
+import { formatCurrency } from "@/app/(dashboard)/dashboard/projects/utils"
+import { getOrganizationTypeLabelLowercase } from "@/lib/utils/organization"
 import { format } from "date-fns"
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
@@ -30,16 +35,21 @@ type Stat = {
 const COLORS = ["#8b5cf6", "#6366f1", "#3b82f6", "#0ea5e9"]
 
 export function DashboardPageClient() {
+  const { organization, isLoading: orgLoading } = useOrganization()
+  const { setPageLoading } = usePageLoading()
   const [user, setUser] = useState<User | null>(null)
   const supabase = createClient()
 
   // Fetch real data using optimized hooks
-  const { data: memberStats, isLoading: memberStatsLoading } = useMemberStatistics()
+  const memberStatsQuery = useMemberStatistics()
+  const { data: memberStats } = memberStatsQuery
   const { data: todayBirthdays = [], isLoading: birthdaysLoading } = useUpcomingBirthdays(1) // Today only
   const { data: recentMembers = [], isLoading: recentMembersLoading } = useRecentMembers(4)
-  const { data: financeOverview, isLoading: financeLoading } = useFinanceOverview()
+  const financeQuery = useFinanceOverview()
+  const { data: financeOverview } = financeQuery
   const { data: financeTrends = [], isLoading: trendsLoading } = useFinanceMonthlyTrends(6)
-  const { data: events = [], isLoading: eventsLoading } = useEvents()
+  const eventsQuery = useEvents()
+  const { data: events = [] } = eventsQuery
   const { data: visitorsData, isLoading: visitorsLoading } = useVisitorsPaginated(1, 100) // Get recent visitors
   const { data: growthData = [], isLoading: growthLoading } = useMemberGrowthData("all")
 
@@ -98,7 +108,7 @@ export function DashboardPageClient() {
       },
       {
         title: "Total Income",
-        value: `GH₵ ${totalIncome.toLocaleString()}`,
+        value: formatCurrency(totalIncome, organization?.currency || "USD"),
         change: "+0%",
         changeType: "neutral" as const,
         icon: DollarSign,
@@ -146,26 +156,105 @@ export function DashboardPageClient() {
       }))
   }, [events])
 
-  const isLoading = memberStatsLoading || birthdaysLoading || recentMembersLoading || 
-                    financeLoading || trendsLoading || eventsLoading || visitorsLoading || growthLoading
+  // Check if critical queries have completed (using proper React Query status)
+  // Use the query objects already fetched above
+  const criticalQueriesComplete = useQueriesCompletion([
+    memberStatsQuery,
+    financeQuery,
+    eventsQuery
+  ])
+  
+  // SIMPLIFIED: Only wait for organization, show page immediately after
+  // Queries will load in background and show their own loading states
+  const criticalLoading = useMemo(() => {
+    // If organization is still loading, we're definitely loading
+    if (orgLoading) {
+      return true
+    }
+    
+    const hasOrganization = !!organization?.id
+    
+    // If no organization yet, we're still loading
+    if (!hasOrganization) {
+      return true
+    }
+    
+    // Once organization is ready, show the page immediately
+    // Don't wait for queries - they can load in background
+    return false
+  }, [orgLoading, organization?.id])
+  
+  // Use ref to track previous loading state and prevent unnecessary updates
+  const prevLoadingRef = useRef(criticalLoading)
+  const orgJustLoadedRef = useRef(false)
+  
+  // Track when organization just finished loading
+  useEffect(() => {
+    if (orgLoading) {
+      orgJustLoadedRef.current = false
+    } else if (organization?.id && !orgJustLoadedRef.current) {
+      // Organization just finished loading - give queries a moment to start
+      orgJustLoadedRef.current = true
+    }
+  }, [orgLoading, organization?.id])
+  
+  // Update page loading state - set to true when org is loading, false when ready
+  useEffect(() => {
+    // Set loading state based on org loading
+    const isCurrentlyLoading = orgLoading || !organization?.id
+    setPageLoading(isCurrentlyLoading)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DashboardClient] Page loading state:', isCurrentlyLoading, {
+        orgLoading,
+        hasOrg: !!organization?.id,
+        orgId: organization?.id
+      })
+    }
+  }, [orgLoading, organization?.id, setPageLoading])
+  
+  // Safety timeout: if loader is stuck for more than 10 seconds, force it off
+  // This is a last resort - proper completion detection should handle it
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (criticalLoading) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Loader] Safety timeout reached after 10s - forcing page to show', {
+            orgLoading,
+            hasOrg: !!organization?.id,
+            memberStatsComplete: isQueryComplete(memberStatsQuery),
+            financeComplete: isQueryComplete(financeQuery),
+            eventsComplete: isQueryComplete(eventsQuery)
+          })
+        }
+        setPageLoading(false)
+      }
+    }, 10000)
+    
+    // Cleanup
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [criticalLoading, setPageLoading, orgLoading, organization?.id, memberStatsQuery, financeQuery, eventsQuery])
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setPageLoading(false)
+    }
+  }, [setPageLoading])
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {userName}!</p>
-        </div>
-        <CompactLoader />
-      </div>
-    )
+  // Don't render content until organization is loaded
+  // Queries can load in background
+  if (orgLoading || !organization?.id) {
+    return null; // Layout loader will handle the loading state
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, {userName}! Here's what's happening with your organization.</p>
+        <p className="text-muted-foreground">Welcome back, {userName}! Here's what's happening with your {getOrganizationTypeLabelLowercase(organization?.type)}.</p>
       </div>
 
       {/* Stats Grid */}

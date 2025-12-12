@@ -9,9 +9,12 @@ import { useTheme } from "next-themes"
 import { ArrowUpRight, ArrowDownRight, Wallet, AlertCircle } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { useIncomeRecords, useExpenditureRecords, useLiabilities, useAccounts } from "@/hooks/finance"
+import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency } from "./utils"
 
 export default function OverviewContent() {
   const { resolvedTheme } = useTheme()
+  const { organization } = useOrganization()
   const [mounted, setMounted] = useState(false)
   const [timeFilter, setTimeFilter] = useState<"all" | "month" | "quarter" | "year">("all")
 
@@ -125,13 +128,14 @@ export default function OverviewContent() {
     // Net Balance should be the sum of all account balances (source of truth)
     const netBalance = accounts.reduce((sum, account) => sum + (account.balance || 0), 0)
 
+    const currency = organization?.currency || "USD"
     return [
-      { label: "Total Income", value: `GH₵${totalIncome.toLocaleString()}`, icon: ArrowUpRight, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950" },
-      { label: "Total Expenses", value: `GH₵${totalExpenses.toLocaleString()}`, icon: ArrowDownRight, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950" },
-      { label: "Net Balance", value: `GH₵${netBalance.toLocaleString()}`, icon: Wallet, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
-      { label: "Liabilities", value: `GH₵${totalLiabilities.toLocaleString()}`, icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-950" },
+      { label: "Total Income", value: formatCurrency(totalIncome, currency), icon: ArrowUpRight, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950" },
+      { label: "Total Expenses", value: formatCurrency(totalExpenses, currency), icon: ArrowDownRight, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950" },
+      { label: "Net Balance", value: formatCurrency(netBalance, currency), icon: Wallet, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
+      { label: "Liabilities", value: formatCurrency(totalLiabilities, currency), icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-950" },
     ]
-  }, [filteredIncomeRecords, filteredExpenditureRecords, liabilities, accounts])
+  }, [filteredIncomeRecords, filteredExpenditureRecords, liabilities, accounts, organization])
 
   // Compute trend data based on time filter
   const trendData = useMemo(() => {
@@ -443,7 +447,7 @@ export default function OverviewContent() {
                     color: chartTextColor
                   }}
                   labelStyle={{ color: chartTextColor }}
-                  formatter={(value: number) => `GH₵ ${value.toLocaleString()}`}
+                  formatter={(value: number) => formatCurrency(value, organization?.currency || "USD")}
                 />
                 <Legend wrapperStyle={{ color: chartTextColor }} />
                 <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} name="Income" />
@@ -492,7 +496,7 @@ export default function OverviewContent() {
                       color: chartTextColor
                     }}
                     labelStyle={{ color: chartTextColor }}
-                    formatter={(value: number) => `GH₵ ${value.toLocaleString()}`}
+                    formatter={(value: number) => formatCurrency(value, organization?.currency || "USD")}
                   />
                   <Bar 
                     dataKey="value" 
@@ -544,7 +548,7 @@ export default function OverviewContent() {
                       color: chartTextColor
                     }}
                     labelStyle={{ color: chartTextColor }}
-                    formatter={(value: number) => `GH₵ ${value.toLocaleString()}`}
+                    formatter={(value: number) => formatCurrency(value, organization?.currency || "USD")}
                   />
                   <Bar 
                     dataKey="value" 

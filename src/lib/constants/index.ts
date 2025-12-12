@@ -4,7 +4,6 @@ export const APP_DESCRIPTION = 'Comprehensive management platform for churches, 
 export const ORGANIZATION_TYPES = [
   { value: 'church', label: 'Church' },
   { value: 'association', label: 'Association' },
-  { value: 'club', label: 'Club' },
   { value: 'nonprofit', label: 'Non-profit Organization' },
   { value: 'other', label: 'Other' },
 ]

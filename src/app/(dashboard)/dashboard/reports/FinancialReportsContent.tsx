@@ -10,6 +10,7 @@ import { useIncomeRecords } from "@/hooks/finance/useIncomeRecords"
 import { useExpenditureRecords } from "@/hooks/finance/useExpenditureRecords"
 import { useLiabilities } from "@/hooks/finance/useLiabilities"
 import { useAssets } from "@/hooks/assets"
+import { useOrganization } from "@/hooks/use-organization"
 import type { PeriodType, DateRange, FinancialSummary } from "./types"
 import { getDateRangeForPeriod, formatCurrency, formatDate, formatNumber, getMonthYear, calculatePercentageChange, generateCSV, downloadCSV } from "./utils"
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
@@ -36,6 +37,8 @@ interface BalanceSheetData {
 }
 
 export default function FinancialReportsContent() {
+  const { organization } = useOrganization()
+  const currency = organization?.currency || "USD"
   const [reportType, setReportType] = useState<FinancialReportType>("income-statement")
   const [period, setPeriod] = useState<PeriodType>("month")
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
@@ -338,7 +341,7 @@ export default function FinancialReportsContent() {
       // Income Statement PDF - Total
       doc.setFontSize(14)
       doc.setFont(undefined, "bold")
-      doc.text(`Total Income: ${formatCurrency(summary.totalIncome)}`, margin, yPos)
+      doc.text(`Total Income: ${formatCurrency(summary.totalIncome, currency)}`, margin, yPos)
       yPos += 15
 
       // Categories Table
@@ -346,12 +349,12 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Income by Category", margin, yPos)
       yPos += 8
-      const incomeCategoryData = summary.incomeByCategory.map((item) => [item.category, formatCurrency(item.amount)])
+      const incomeCategoryData = summary.incomeByCategory.map((item) => [item.category, formatCurrency(item.amount, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Category", "Amount"]],
-        body: incomeCategoryData.length > 0 ? incomeCategoryData : [["No categories", "GH₵ 0.00"]],
+        body: incomeCategoryData.length > 0 ? incomeCategoryData : [["No categories", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [46, 125, 50], textColor: 255, fontStyle: "bold" },
       })
@@ -368,13 +371,13 @@ export default function FinancialReportsContent() {
         record.category,
         record.source,
         record.method,
-        formatCurrency(record.amount),
+        formatCurrency(record.amount, currency),
       ])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Date", "Category", "Source", "Method", "Amount"]],
-        body: incomeRecordsData.length > 0 ? incomeRecordsData : [["No records", "", "", "", "GH₵ 0.00"]],
+        body: incomeRecordsData.length > 0 ? incomeRecordsData : [["No records", "", "", "", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [46, 125, 50], textColor: 255, fontStyle: "bold" },
         columnStyles: { 4: { halign: "right" } },
@@ -383,7 +386,7 @@ export default function FinancialReportsContent() {
       // Expenditure Statement PDF - Total
       doc.setFontSize(14)
       doc.setFont(undefined, "bold")
-      doc.text(`Total Expenditure: ${formatCurrency(summary.totalExpenditure)}`, margin, yPos)
+      doc.text(`Total Expenditure: ${formatCurrency(summary.totalExpenditure, currency)}`, margin, yPos)
       yPos += 15
 
       // Categories Table
@@ -391,12 +394,12 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Expenditure by Category", margin, yPos)
       yPos += 8
-      const expenseCategoryData = summary.expenditureByCategory.map((item) => [item.category, formatCurrency(item.amount)])
+      const expenseCategoryData = summary.expenditureByCategory.map((item) => [item.category, formatCurrency(item.amount, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Category", "Amount"]],
-        body: expenseCategoryData.length > 0 ? expenseCategoryData : [["No categories", "GH₵ 0.00"]],
+        body: expenseCategoryData.length > 0 ? expenseCategoryData : [["No categories", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [231, 76, 60], textColor: 255, fontStyle: "bold" },
       })
@@ -413,13 +416,13 @@ export default function FinancialReportsContent() {
         record.category,
         record.description,
         record.method,
-        formatCurrency(record.amount),
+        formatCurrency(record.amount, currency),
       ])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Date", "Category", "Description", "Method", "Amount"]],
-        body: expenditureRecordsData.length > 0 ? expenditureRecordsData : [["No records", "", "", "", "GH₵ 0.00"]],
+        body: expenditureRecordsData.length > 0 ? expenditureRecordsData : [["No records", "", "", "", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [231, 76, 60], textColor: 255, fontStyle: "bold" },
         columnStyles: { 4: { halign: "right" } },
@@ -434,11 +437,11 @@ export default function FinancialReportsContent() {
       // Total
       doc.setFontSize(14)
       doc.setFont(undefined, "bold")
-      doc.text(`Total Outstanding Balance: ${formatCurrency(totalBalance)}`, margin, yPos)
+      doc.text(`Total Outstanding Balance: ${formatCurrency(totalBalance, currency)}`, margin, yPos)
       yPos += 8
       doc.setFontSize(10)
       doc.setFont(undefined, "normal")
-      doc.text(`Original: ${formatCurrency(totalOriginal)} | Paid: ${formatCurrency(totalPaid)}`, margin, yPos)
+      doc.text(`Original: ${formatCurrency(totalOriginal, currency)} | Paid: ${formatCurrency(totalPaid, currency)}`, margin, yPos)
       yPos += 15
 
       // Individual Liability Records Table
@@ -451,16 +454,16 @@ export default function FinancialReportsContent() {
         liability.category,
         liability.description,
         liability.creditor,
-        formatCurrency(liability.originalAmount),
-        formatCurrency(liability.amountPaid),
-        formatCurrency(liability.balance),
+        formatCurrency(liability.originalAmount, currency),
+        formatCurrency(liability.amountPaid, currency),
+        formatCurrency(liability.balance, currency),
         liability.status,
       ])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Date", "Category", "Description", "Creditor", "Original Amount", "Amount Paid", "Balance Remaining", "Status"]],
-        body: liabilityData.length > 0 ? liabilityData : [["No liabilities", "", "", "", "GH₵ 0.00", "GH₵ 0.00", "GH₵ 0.00", ""]],
+        body: liabilityData.length > 0 ? liabilityData : [["No liabilities", "", "", "", formatCurrency(0, currency), formatCurrency(0, currency), formatCurrency(0, currency), ""]],
         theme: "striped",
         headStyles: { fillColor: [230, 126, 34], textColor: 255, fontStyle: "bold" },
         columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
@@ -472,18 +475,18 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Assets", margin, yPos)
       yPos += 8
-      const assetData = balanceSheetData.assets.map((item) => [item.category, formatCurrency(item.value)])
+      const assetData = balanceSheetData.assets.map((item) => [item.category, formatCurrency(item.value, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Asset Category", "Value"]],
-        body: assetData.length > 0 ? assetData : [["No assets", "GH₵ 0.00"]],
+        body: assetData.length > 0 ? assetData : [["No assets", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [46, 125, 50], textColor: 255, fontStyle: "bold" },
       })
       let finalY = (doc as any).lastAutoTable.finalY
       doc.setFont(undefined, "bold")
-      doc.text(`Total Assets: ${formatCurrency(balanceSheetData.totalAssets)}`, margin, finalY + 10)
+      doc.text(`Total Assets: ${formatCurrency(balanceSheetData.totalAssets, currency)}`, margin, finalY + 10)
       yPos = finalY + 20
 
       // Income
@@ -491,18 +494,18 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Income", margin, yPos)
       yPos += 8
-      const incomeData = balanceSheetData.income.map((item) => [item.category, formatCurrency(item.amount)])
+      const incomeData = balanceSheetData.income.map((item) => [item.category, formatCurrency(item.amount, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Income Category", "Amount"]],
-        body: incomeData.length > 0 ? incomeData : [["No income", "GH₵ 0.00"]],
+        body: incomeData.length > 0 ? incomeData : [["No income", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [46, 125, 50], textColor: 255, fontStyle: "bold" },
       })
       finalY = (doc as any).lastAutoTable.finalY
       doc.setFont(undefined, "bold")
-      doc.text(`Total Income: ${formatCurrency(balanceSheetData.totalIncome)}`, margin, finalY + 10)
+      doc.text(`Total Income: ${formatCurrency(balanceSheetData.totalIncome, currency)}`, margin, finalY + 10)
       yPos = finalY + 20
 
       // Expense
@@ -510,18 +513,18 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Expense", margin, yPos)
       yPos += 8
-      const expenseData = balanceSheetData.expense.map((item) => [item.category, formatCurrency(item.amount)])
+      const expenseData = balanceSheetData.expense.map((item) => [item.category, formatCurrency(item.amount, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Expense Category", "Amount"]],
-        body: expenseData.length > 0 ? expenseData : [["No expenses", "GH₵ 0.00"]],
+        body: expenseData.length > 0 ? expenseData : [["No expenses", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [231, 76, 60], textColor: 255, fontStyle: "bold" },
       })
       finalY = (doc as any).lastAutoTable.finalY
       doc.setFont(undefined, "bold")
-      doc.text(`Total Expense: ${formatCurrency(balanceSheetData.totalExpense)}`, margin, finalY + 10)
+      doc.text(`Total Expense: ${formatCurrency(balanceSheetData.totalExpense, currency)}`, margin, finalY + 10)
       yPos = finalY + 20
 
       // Liabilities
@@ -529,18 +532,18 @@ export default function FinancialReportsContent() {
       doc.setFont(undefined, "bold")
       doc.text("Liabilities", margin, yPos)
       yPos += 8
-      const liabilityData = balanceSheetData.liabilities.map((item) => [item.category, formatCurrency(item.balance)])
+      const liabilityData = balanceSheetData.liabilities.map((item) => [item.category, formatCurrency(item.balance, currency)])
       // @ts-expect-error - jspdf-autotable extends jsPDF prototype
       doc.autoTable({
         startY: yPos,
         head: [["Liability Category", "Balance Remaining"]],
-        body: liabilityData.length > 0 ? liabilityData : [["No liabilities", "GH₵ 0.00"]],
+        body: liabilityData.length > 0 ? liabilityData : [["No liabilities", formatCurrency(0, currency)]],
         theme: "striped",
         headStyles: { fillColor: [230, 126, 34], textColor: 255, fontStyle: "bold" },
       })
       finalY = (doc as any).lastAutoTable.finalY
       doc.setFont(undefined, "bold")
-      doc.text(`Total Liabilities: ${formatCurrency(balanceSheetData.totalLiabilities)}`, margin, finalY + 10)
+      doc.text(`Total Liabilities: ${formatCurrency(balanceSheetData.totalLiabilities, currency)}`, margin, finalY + 10)
     }
 
     // Save PDF
@@ -787,13 +790,13 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Net Worth</p>
                 <p className={`text-lg font-semibold ${financialHealth.netWorth >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(financialHealth.netWorth)}
+                  {formatCurrency(financialHealth.netWorth, currency)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Net Income</p>
                 <p className={`text-lg font-semibold ${financialHealth.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(financialHealth.netIncome)}
+                  {formatCurrency(financialHealth.netIncome, currency)}
                 </p>
               </div>
             </div>
@@ -815,7 +818,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
               data.assets.map((item, index) => (
                 <div key={index} className="px-4 py-3 flex justify-between items-center hover:bg-muted/50">
                   <span className="text-sm">{item.category}</span>
-                  <span className="font-medium">{formatCurrency(item.value)}</span>
+                  <span className="font-medium">{formatCurrency(item.value, currency)}</span>
                 </div>
               ))
             ) : (
@@ -824,7 +827,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
           </div>
           <div className="bg-muted/50 px-4 py-3 border-t font-semibold flex justify-between">
             <span>Total Assets</span>
-            <span>{formatCurrency(data.totalAssets)}</span>
+            <span>{formatCurrency(data.totalAssets, currency)}</span>
           </div>
         </div>
       </div>
@@ -843,7 +846,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
               data.income.map((item, index) => (
                 <div key={index} className="px-4 py-3 flex justify-between items-center hover:bg-muted/50">
                   <span className="text-sm">{item.category}</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(item.amount)}</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(item.amount, currency)}</span>
                 </div>
               ))
             ) : (
@@ -852,7 +855,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
           </div>
           <div className="bg-muted/50 px-4 py-3 border-t font-semibold flex justify-between">
             <span>Total Income</span>
-            <span className="text-green-700 dark:text-green-400">{formatCurrency(data.totalIncome)}</span>
+            <span className="text-green-700 dark:text-green-400">{formatCurrency(data.totalIncome, currency)}</span>
           </div>
         </div>
       </div>
@@ -871,7 +874,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
               data.expense.map((item, index) => (
                 <div key={index} className="px-4 py-3 flex justify-between items-center hover:bg-muted/50">
                   <span className="text-sm">{item.category}</span>
-                  <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(item.amount)}</span>
+                  <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(item.amount, currency)}</span>
                 </div>
               ))
             ) : (
@@ -880,7 +883,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
           </div>
           <div className="bg-muted/50 px-4 py-3 border-t font-semibold flex justify-between">
             <span>Total Expense</span>
-            <span className="text-red-700 dark:text-red-400">{formatCurrency(data.totalExpense)}</span>
+            <span className="text-red-700 dark:text-red-400">{formatCurrency(data.totalExpense, currency)}</span>
           </div>
         </div>
       </div>
@@ -899,7 +902,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
               data.liabilities.map((item, index) => (
                 <div key={index} className="px-4 py-3 flex justify-between items-center hover:bg-muted/50">
                   <span className="text-sm">{item.category}</span>
-                  <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrency(item.balance)}</span>
+                  <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrency(item.balance, currency)}</span>
                 </div>
               ))
             ) : (
@@ -908,7 +911,7 @@ function FinancialStatementView({ data }: { data: BalanceSheetData }) {
           </div>
           <div className="bg-muted/50 px-4 py-3 border-t font-semibold flex justify-between">
             <span>Total Liabilities (Balance Remaining)</span>
-            <span className="text-orange-700 dark:text-orange-400">{formatCurrency(data.totalLiabilities)}</span>
+            <span className="text-orange-700 dark:text-orange-400">{formatCurrency(data.totalLiabilities, currency)}</span>
           </div>
         </div>
       </div>
@@ -966,7 +969,7 @@ function IncomeStatementView({
               <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(summary.totalIncome)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(summary.totalIncome, currency)}</div>
             </CardContent>
           </Card>
 
@@ -991,7 +994,7 @@ function IncomeStatementView({
                     <TableRow key={index}>
                       <TableCell className="font-medium">{item.category}</TableCell>
                       <TableCell className="text-right font-semibold text-green-600">
-                        {formatCurrency(item.amount)}
+                        {formatCurrency(item.amount, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1051,7 +1054,7 @@ function IncomeStatementView({
                       <TableCell>{record.source}</TableCell>
                       <TableCell>{record.method}</TableCell>
                       <TableCell className="text-right font-semibold text-green-600">
-                        {formatCurrency(record.amount)}
+                        {formatCurrency(record.amount, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1138,7 +1141,7 @@ function ExpenditureStatementView({
               <TrendingDown className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(summary.totalExpenditure)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(summary.totalExpenditure, currency)}</div>
             </CardContent>
           </Card>
 
@@ -1163,7 +1166,7 @@ function ExpenditureStatementView({
                     <TableRow key={index}>
                       <TableCell className="font-medium">{item.category}</TableCell>
                       <TableCell className="text-right font-semibold text-red-600">
-                        {formatCurrency(item.amount)}
+                        {formatCurrency(item.amount, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1223,7 +1226,7 @@ function ExpenditureStatementView({
                       <TableCell>{record.description}</TableCell>
                       <TableCell>{record.method}</TableCell>
                       <TableCell className="text-right font-semibold text-red-600">
-                        {formatCurrency(record.amount)}
+                        {formatCurrency(record.amount, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1319,9 +1322,9 @@ function LiabilityStatementView({
           <TrendingDown className="h-4 w-4 text-orange-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-orange-700">{formatCurrency(totalBalance)}</div>
+          <div className="text-2xl font-bold text-orange-700">{formatCurrency(totalBalance, currency)}</div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Original: {formatCurrency(totalOriginal)} | Paid: {formatCurrency(totalPaid)}
+            Original: {formatCurrency(totalOriginal, currency)} | Paid: {formatCurrency(totalPaid, currency)}
           </div>
         </CardContent>
       </Card>
@@ -1356,13 +1359,13 @@ function LiabilityStatementView({
                       <TableCell>{liability.description}</TableCell>
                       <TableCell>{liability.creditor}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(liability.originalAmount)}
+                        {formatCurrency(liability.originalAmount, currency)}
                       </TableCell>
                       <TableCell className="text-right text-blue-600 font-medium">
-                        {formatCurrency(liability.amountPaid)}
+                        {formatCurrency(liability.amountPaid, currency)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-orange-600">
-                        {formatCurrency(liability.balance)}
+                        {formatCurrency(liability.balance, currency)}
                       </TableCell>
                       <TableCell>
                         <span

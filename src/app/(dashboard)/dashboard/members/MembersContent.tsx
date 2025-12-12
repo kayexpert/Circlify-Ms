@@ -1218,7 +1218,7 @@ export default function MembersContent() {
                           />
                         </div>
 
-                        {/* Church Information Section */}
+                        {/* Organization Information Section */}
                         <div className="mb-4 pt-4 border-t">
                           <p className="text-md font-semibold mb-4">Organization Information</p>
                         </div>
@@ -1375,7 +1375,7 @@ export default function MembersContent() {
                                               {record.reference || "-"}
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-green-600">
-                                              {formatCurrency(record.amount || 0)}
+                                              {formatCurrency(record.amount || 0, organization?.currency || "USD")}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-muted-foreground">
                                               {record.method}
@@ -1389,11 +1389,11 @@ export default function MembersContent() {
                               <div className="grid grid-cols-2 gap-4">
                                 <Card className="p-4">
                                   <p className="text-sm text-muted-foreground mb-1">Total Contributions</p>
-                                  <p className="text-2xl font-bold">GH₵ {contributionStats.total.toLocaleString()}</p>
+                                  <p className="text-2xl font-bold">{formatCurrency(contributionStats.total, organization?.currency || "USD")}</p>
                                 </Card>
                                 <Card className="p-4">
                                   <p className="text-sm text-muted-foreground mb-1">This Year</p>
-                                  <p className="text-2xl font-bold">{formatCurrency(contributionStats.thisYear)}</p>
+                                  <p className="text-2xl font-bold">{formatCurrency(contributionStats.thisYear, organization?.currency || "USD")}</p>
                                 </Card>
                               </div>
                             </>

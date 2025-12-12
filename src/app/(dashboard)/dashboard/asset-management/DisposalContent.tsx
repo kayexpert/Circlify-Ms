@@ -14,11 +14,14 @@ import { toast } from "sonner"
 import { useAssetDisposals, useCreateAssetDisposal, useDeleteAssetDisposal } from "@/hooks/assets"
 import { useAssets } from "@/hooks/assets"
 import { useAccounts } from "@/hooks/finance/useAccounts"
+import { useOrganization } from "@/hooks/use-organization"
+import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { DisposalRecord, Asset } from "./types"
 import type { Account } from "@/app/(dashboard)/dashboard/finance/types"
 import { formatDate } from "./utils"
 
 export default function DisposalContent() {
+  const { organization } = useOrganization()
   const [disposalFormData, setDisposalFormData] = useState({
     date: new Date() as Date | undefined,
     assetId: "",
@@ -279,7 +282,7 @@ export default function DisposalContent() {
                         <TableCell className="font-medium">{disposal.assetName}</TableCell>
                         <TableCell>{disposal.assetCategory}</TableCell>
                         <TableCell className="font-bold text-green-600">
-                          GH₵ {disposal.amount.toLocaleString()}
+                          {formatCurrency(disposal.amount, organization?.currency || "USD")}
                         </TableCell>
                         <TableCell>{disposal.account}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">

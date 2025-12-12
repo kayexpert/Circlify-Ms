@@ -263,7 +263,7 @@ export function useCreateIncomeRecord() {
             }
 
             // Get template if configured
-            let messageText = `Thank you for your contribution of ${variables.recordData.amount?.toLocaleString() || 0} ${organization.currency || "GHS"} on ${new Date(variables.recordData.date).toLocaleDateString()}. We appreciate your support!`
+            let messageText = `Thank you for your contribution of ${variables.recordData.amount?.toLocaleString() || 0} ${organization.currency || "USD"} on ${new Date(variables.recordData.date).toLocaleDateString()}. We appreciate your support!`
             
             if ((notificationSettings as any).contribution_template_id) {
               const { data: template } = await supabase
@@ -279,7 +279,7 @@ export function useCreateIncomeRecord() {
                   LastName: (member as any).last_name || "",
                   PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
                   Amount: (variables.recordData.amount || 0).toLocaleString(),
-                  Currency: organization.currency || "GHS",
+                  Currency: organization.currency || "USD",
                   Date: new Date(variables.recordData.date).toLocaleDateString(),
                   Category: variables.recordData.category || "",
                 })

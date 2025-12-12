@@ -36,13 +36,15 @@ export async function updateSession(request: NextRequest) {
   } catch (error) {
     // Edge Runtime fetch failures are common - log but don't block
     // The page-level auth checks will handle authentication
-    console.error('Middleware auth check failed (Edge Runtime):', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Middleware auth check failed (Edge Runtime):', error)
+    }
     // Continue without user - let page handle auth
   }
 
   // Protected routes - require authentication
   const protectedRoutes = ['/dashboard', '/setup-organization']
-  const authRoutes = ['/signin', '/signup']
+  const authRoutes = ['/signin', '/signup', '/forgot-password', '/reset-password']
   const isProtectedRoute = protectedRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
@@ -54,12 +56,41 @@ export async function updateSession(request: NextRequest) {
     // Redirect to signin if not authenticated
     const url = request.nextUrl.clone()
     url.pathname = '/signin'
+    // Preserve the intended destination for redirect after login
+    if (request.nextUrl.pathname !== '/signin') {
+      url.searchParams.set('redirect', request.nextUrl.pathname)
+    }
     return NextResponse.redirect(url)
   }
 
   if (isAuthRoute && user) {
-    // Redirect authenticated users to dashboard
-    // The dashboard layout will check for organizations and redirect if needed
+    // Redirect authenticated users away from auth pages
+    // Check if they have an organization first
+    try {
+      const { data: session } = await supabase
+        .from('user_sessions')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (session?.organization_id) {
+        // User has an organization, redirect to dashboard
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      } else {
+        // User doesn't have an organization, redirect to setup
+        const url = request.nextUrl.clone()
+        url.pathname = '/setup-organization'
+        return NextResponse.redirect(url)
+      }
+    } catch (error) {
+      // If we can't check, redirect to setup organization
+      // The dashboard layout will handle organization checks
+      const url = request.nextUrl.clone()
+      url.pathname = '/setup-organization'
+      return NextResponse.redirect(url)
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

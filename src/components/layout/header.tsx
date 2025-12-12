@@ -7,23 +7,26 @@ import NotificationDropdown from "./NotificationDropdown"
 import UserDropdown from "./UserDropdown"
 import { useSidebarStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
+import { useOrganization } from "@/hooks/use-organization"
+import { getOrganizationTypeLabelLowercase } from "@/lib/utils/organization"
 
 // Map paths to page titles and descriptions
-const getPageInfo = (pathname: string): { title: string; description: string } => {
+const getPageInfo = (pathname: string, orgType?: string | null): { title: string; description: string } => {
+  const orgTypeLower = getOrganizationTypeLabelLowercase(orgType)
   if (pathname === "/dashboard" || pathname === "/dashboard/") {
-    return { title: "Dashboard", description: "Overview of your organization" }
+    return { title: "Dashboard", description: `Overview of your ${orgTypeLower}` }
   }
   if (pathname.startsWith("/dashboard/members")) {
-    return { title: "Members", description: "Manage church members, attendance, and groups" }
+    return { title: "Members", description: `Manage ${orgTypeLower} members, attendance, and groups` }
   }
   if (pathname.startsWith("/dashboard/finance")) {
-    return { title: "Finance", description: "Manage church finances, budgets, and accounts" }
+    return { title: "Finance", description: `Manage ${orgTypeLower} finances, budgets, and accounts` }
   }
   if (pathname.startsWith("/dashboard/asset-management")) {
-    return { title: "Asset Management", description: "Manage church assets, disposals, and categories" }
+    return { title: "Asset Management", description: `Manage ${orgTypeLower} assets, disposals, and categories` }
   }
   if (pathname.startsWith("/dashboard/events")) {
-    return { title: "Events", description: "Manage church events and activities" }
+    return { title: "Events", description: `Manage ${orgTypeLower} events and activities` }
   }
   if (pathname.startsWith("/dashboard/projects")) {
     return { title: "Projects", description: "Manage projects, track income and expenditure" }
@@ -35,15 +38,16 @@ const getPageInfo = (pathname: string): { title: string; description: string } =
     return { title: "Reports", description: "View and generate reports" }
   }
   if (pathname.startsWith("/dashboard/settings")) {
-    return { title: "Settings", description: "Configure your organization settings" }
+    return { title: "Settings", description: `Configure your ${orgTypeLower} settings` }
   }
-  return { title: "Dashboard", description: "Overview of your organization" }
+  return { title: "Dashboard", description: `Overview of your ${orgTypeLower}` }
 }
 
 export function Header() {
+  const { organization } = useOrganization()
   const { toggle, isOpen } = useSidebarStore()
   const pathname = usePathname()
-  const pageInfo = getPageInfo(pathname)
+  const pageInfo = getPageInfo(pathname, organization?.type)
 
   return (
     <header className="flex-shrink-0 flex h-16 w-full items-center bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">

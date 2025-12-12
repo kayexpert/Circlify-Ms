@@ -134,7 +134,7 @@ export function ProjectFormSheet({ isOpen, onOpenChange, projectId }: ProjectFor
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Church Building Project"
+              placeholder="e.g., Building Project"
               required
             />
           </div>
