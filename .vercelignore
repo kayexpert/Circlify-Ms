@@ -1,0 +1,38 @@
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Build artifacts (handled by Vercel)
+.next
+out
+dist
+
+# Dependencies (installed by Vercel)
+node_modules
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.tsbuildinfo
+.cache
+

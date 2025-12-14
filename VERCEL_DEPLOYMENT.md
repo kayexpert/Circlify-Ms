@@ -7,6 +7,7 @@ This guide will help you deploy your Circlify Management System to Vercel withou
 - A GitHub account (or GitLab/Bitbucket)
 - A Vercel account (sign up at https://vercel.com)
 - Your Supabase project credentials
+- Sentry account (optional, for error monitoring)
 
 ## Step 1: Prepare Your Repository
 
@@ -59,11 +60,29 @@ This guide will help you deploy your Circlify Management System to Vercel withou
 ### Required Environment Variables
 
 ```env
+# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Application URLs
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
+```
+
+### Optional Environment Variables
+
+```env
+# External API (if using external API services)
+NEXT_PUBLIC_API_URL=https://your-external-api.com/api/v1
+
+# Sentry Error Monitoring (Recommended for production)
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
+SENTRY_ORG=your_sentry_org
+SENTRY_PROJECT=your_sentry_project
+
+# Webhook Security (if using Wigal SMS webhooks)
+WIGAL_WEBHOOK_SECRET=your_webhook_secret
 ```
 
 ### Where to Find Supabase Credentials
@@ -76,11 +95,13 @@ NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
    - **anon/public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ Keep this secret!)
 
-### Optional Environment Variables
+### Where to Find Sentry Credentials
 
-```env
-NEXT_PUBLIC_API_URL=https://your-external-api.com/api/v1
-```
+1. Go to your [Sentry Dashboard](https://sentry.io)
+2. Select your project
+3. Go to **Settings** → **Projects** → **Client Keys (DSN)**
+4. Copy the DSN → `NEXT_PUBLIC_SENTRY_DSN`
+5. For `SENTRY_ORG` and `SENTRY_PROJECT`, check your Sentry project settings
 
 ### Environment Variable Settings
 
@@ -116,6 +137,18 @@ git push
 1. Visit your deployment URL: `https://your-app.vercel.app`
 2. Test authentication (sign in/sign up)
 3. Verify all features work correctly
+4. Check Vercel function logs for any errors
+
+## Vercel Configuration
+
+The project includes a `vercel.json` file with optimized settings:
+
+- **Framework**: Next.js (auto-detected)
+- **Build Command**: `npm run build`
+- **Install Command**: `npm install`
+- **Function Timeout**: 30 seconds for API routes
+- **Region**: US East (iad1) - can be changed in vercel.json
+- **Security Headers**: Configured for XSS protection, frame options, and content type
 
 ## Troubleshooting
 
@@ -129,11 +162,15 @@ git push
 **Error: Module not found**
 - Run `npm install` locally to verify dependencies
 - Check `package.json` for any missing dependencies
-- Ensure Node.js version is compatible (18+)
+- Ensure Node.js version is compatible (18+) - specified in `package.json` engines
 
 **Error: TypeScript errors**
 - Run `npm run build` locally to catch errors
 - Fix any TypeScript errors before deploying
+
+**Error: Sentry build fails**
+- If Sentry is optional, you can temporarily remove Sentry config from `next.config.ts`
+- Or ensure `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are set
 
 ### Runtime Errors
 
@@ -151,6 +188,12 @@ git push
 - Check `SUPABASE_SERVICE_ROLE_KEY` is set correctly
 - Review Vercel function logs in the dashboard
 - Verify RLS policies in Supabase
+- Check function timeout settings (default is 30 seconds)
+
+**Error: Function timeout**
+- Some API routes may need longer execution time
+- Update `vercel.json` to increase `maxDuration` for specific routes
+- Consider optimizing database queries
 
 ### Performance Issues
 
@@ -158,6 +201,7 @@ git push
 - Check function execution time in Vercel dashboard
 - Optimize database queries if needed
 - Consider enabling Edge Runtime for API routes if appropriate
+- Review Next.js Image optimization settings
 
 ## Vercel-Specific Features
 
@@ -181,30 +225,43 @@ You can set different values for:
 - **Preview**: Pull request previews
 - **Development**: Development branches
 
+### Function Logs
+
+- View real-time logs in Vercel dashboard
+- Filter by deployment, function, or time range
+- Useful for debugging API route issues
+
 ## Post-Deployment Checklist
 
-- [ ] All environment variables configured
+- [ ] All required environment variables configured
+- [ ] Optional environment variables configured (Sentry, API URLs, etc.)
 - [ ] Supabase redirect URLs updated
-- [ ] Authentication working
+- [ ] Authentication working (sign in/sign up)
 - [ ] Database connections successful
 - [ ] API routes functioning
 - [ ] File uploads working (if applicable)
 - [ ] SMS messaging working (if configured)
 - [ ] Custom domain configured (if applicable)
 - [ ] Analytics enabled (optional)
-- [ ] Error monitoring set up (optional)
+- [ ] Error monitoring set up (Sentry - optional)
+- [ ] Function logs reviewed for errors
+- [ ] Performance metrics checked
 
 ## Additional Resources
 
 - [Vercel Documentation](https://vercel.com/docs)
 - [Next.js Deployment](https://nextjs.org/docs/deployment)
 - [Supabase Documentation](https://supabase.com/docs)
+- [Sentry Next.js Documentation](https://docs.sentry.io/platforms/javascript/guides/nextjs/)
 
 ## Support
 
 If you encounter issues:
+
 1. Check Vercel deployment logs
-2. Check Supabase logs
-3. Review browser console for client-side errors
-4. Verify all environment variables are set correctly
+2. Check Vercel function logs
+3. Check Supabase logs
+4. Review browser console for client-side errors
+5. Verify all environment variables are set correctly
+6. Test locally with `npm run build` to catch build-time errors
 
