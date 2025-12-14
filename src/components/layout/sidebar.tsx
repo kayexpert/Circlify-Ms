@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CalendarDays, DollarSign, MessageSquare, Package, BarChart3, Settings, Clock, FolderKanban } from "lucide-react"
+import { LayoutDashboard, Users, CalendarDays, DollarSign, MessageSquare, Package, BarChart3, Settings, FolderKanban } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -51,11 +51,6 @@ const menuItems = [
     title: "Reports",
     href: "/dashboard/reports",
     icon: BarChart3,
-  },
-  {
-    title: "Test Cron Jobs",
-    href: "/dashboard/test-cron-jobs",
-    icon: Clock,
   },
   {
     title: "Settings",

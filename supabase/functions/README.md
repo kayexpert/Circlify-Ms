@@ -123,4 +123,4 @@ curl -X POST http://localhost:54321/functions/v1/process-event-reminders \
   -H "Authorization: Bearer YOUR_ANON_KEY"
 ```
 
-You can also test them via the test page in the dashboard at `/dashboard/test-cron-jobs`.
+You can test them by calling the functions directly via curl or by setting up cron jobs in Supabase.
