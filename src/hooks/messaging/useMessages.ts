@@ -23,7 +23,7 @@ export function useMessages() {
       // Optimized: Only select needed fields and limit results
       const { data, error } = await supabase
         .from("messaging_messages")
-        .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id")
+        .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id, error_message")
         .eq("organization_id", organization.id)
         .order("created_at", { ascending: false })
         .limit(500) // Limit to prevent large queries
@@ -45,6 +45,7 @@ export function useMessages() {
         recurrenceFrequency: message.recurrence_frequency || undefined,
         cost: Number(message.cost) || 0,
         templateId: message.template_id || undefined,
+        errorMessage: (message as any).error_message || undefined,
       })) as Message[]
     },
     enabled: !!organization?.id && !orgLoading,
@@ -72,7 +73,7 @@ export function useMessagesPaginated(page: number = 1, pageSize: number = 20) {
       const [dataResult, countResult] = await Promise.all([
         supabase
           .from("messaging_messages")
-          .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id")
+          .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id, error_message")
           .eq("organization_id", organization.id)
           .order("created_at", { ascending: false })
           .range(from, to),
@@ -104,6 +105,7 @@ export function useMessagesPaginated(page: number = 1, pageSize: number = 20) {
           recurrenceFrequency: message.recurrence_frequency || undefined,
           cost: Number(message.cost) || 0,
           templateId: message.template_id || undefined,
+          errorMessage: (message as any).error_message || undefined,
         })) as Message[],
         total,
         page,
@@ -132,7 +134,7 @@ export function useMessage(messageId: string | null) {
 
       const { data: message, error: messageError } = await (supabase
         .from("messaging_messages") as any)
-        .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id")
+        .select("id, message_name, message_text, recipient_type, recipient_count, status, sent_at, created_at, is_recurring, recurrence_frequency, cost, template_id, error_message")
         .eq("id", messageId)
         .eq("organization_id", organization.id)
         .single()
@@ -170,6 +172,7 @@ export function useMessage(messageId: string | null) {
           recurrenceFrequency: messageData.recurrence_frequency || undefined,
           cost: Number(messageData.cost) || 0,
           templateId: messageData.template_id || undefined,
+          errorMessage: messageData.error_message || undefined,
         } as Message,
         recipients: recipients || [],
       }

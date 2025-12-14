@@ -13,6 +13,7 @@ export interface MemberAttendanceRecord {
   event_id?: string | null
   checked_in_at: string
   notes?: string | null
+  status?: 'present' | 'absent'
   created_at: string
   updated_at: string
 }
@@ -23,6 +24,7 @@ export interface MemberAttendanceRecordInsert {
   service_type: string
   event_id?: string | null
   notes?: string | null
+  status?: 'present' | 'absent'
 }
 
 export interface MemberAttendanceRecordUpdate {
@@ -47,7 +49,7 @@ export function useMemberAttendanceRecords(memberId: string | null) {
 
       const { data, error } = await (supabase
         .from("member_attendance_records") as any)
-        .select("id, member_id, date, service_type, event_id, checked_in_at, notes, created_at, updated_at")
+        .select("id, member_id, date, service_type, event_id, checked_in_at, notes, status, created_at, updated_at")
         .eq("organization_id", orgId)
         .eq("member_id", memberId)
         .order("date", { ascending: false })
@@ -61,8 +63,9 @@ export function useMemberAttendanceRecords(memberId: string | null) {
       return (data || []) as MemberAttendanceRecord[]
     },
     enabled: !!orgId && !!memberId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 0, // Always consider data stale to allow immediate refetch on invalidation
     gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   })
 }
 
@@ -87,6 +90,7 @@ export function useCreateMemberAttendanceRecord() {
           service_type: attendanceData.service_type,
           event_id: attendanceData.event_id || null,
           notes: attendanceData.notes || null,
+          status: attendanceData.status || 'present',
         })
         .select()
         .single()
@@ -107,7 +111,10 @@ export function useCreateMemberAttendanceRecord() {
       return data as MemberAttendanceRecord
     },
     onSuccess: (_, variables) => {
+      // Invalidate the specific member's attendance records
       queryClient.invalidateQueries({ queryKey: ["member_attendance_records", organization?.id, variables.member_id] })
+      // Also invalidate all member attendance records to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ["member_attendance_records", organization?.id] })
       toast.success("Attendance recorded successfully")
     },
     onError: (error: Error) => {
@@ -147,7 +154,21 @@ export function useDeleteMemberAttendanceRecord() {
       }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["member_attendance_records", organization?.id, variables.memberId] })
+      // Invalidate the specific member's attendance records
+      queryClient.invalidateQueries({ 
+        queryKey: ["member_attendance_records", organization?.id, variables.memberId],
+        refetchType: 'active'
+      })
+      // Also invalidate all member attendance records to ensure consistency
+      queryClient.invalidateQueries({ 
+        queryKey: ["member_attendance_records", organization?.id],
+        refetchType: 'active'
+      })
+      // Force refetch to ensure immediate update
+      queryClient.refetchQueries({ 
+        queryKey: ["member_attendance_records", organization?.id],
+        type: 'active'
+      })
       toast.success("Attendance record deleted successfully")
     },
     onError: (error: Error) => {

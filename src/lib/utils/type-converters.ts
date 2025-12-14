@@ -105,6 +105,7 @@ export function convertIncomeRecord(record: FinanceIncomeRecord): IncomeRecord {
     memberId: record.member_id ? parseInt(record.member_id.replace(/-/g, "").substring(0, 8), 16) : undefined,
     memberName: record.member_name || undefined,
     linkedAssetId: record.linked_asset_id ? parseInt(record.linked_asset_id.replace(/-/g, "").substring(0, 8), 16) : undefined,
+    linkedLiabilityId: record.linked_liability_id ? parseInt(record.linked_liability_id.replace(/-/g, "").substring(0, 8), 16) : undefined,
     reconciledInReconciliation: record.reconciled_in_reconciliation
       ? parseInt(record.reconciled_in_reconciliation.replace(/-/g, "").substring(0, 8), 16)
       : null,
@@ -143,6 +144,15 @@ export function convertLiability(liability: FinanceLiability): Liability {
     amountPaid: Number(liability.amount_paid),
     balance: Number(liability.balance),
     status: liability.status,
+    isLoan: liability.is_loan || false,
+    linkedIncomeRecordId: liability.linked_income_record_id
+      ? parseInt(liability.linked_income_record_id.replace(/-/g, "").substring(0, 8), 16)
+      : undefined,
+    interestRate: liability.interest_rate !== null && liability.interest_rate !== undefined ? Number(liability.interest_rate) : null,
+    loanStartDate: liability.loan_start_date ? new Date(liability.loan_start_date + "T00:00:00") : null,
+    loanEndDate: liability.loan_end_date ? new Date(liability.loan_end_date + "T00:00:00") : null,
+    loanDurationDays: liability.loan_duration_days !== null && liability.loan_duration_days !== undefined ? Number(liability.loan_duration_days) : null,
+    amountReceived: liability.amount_received !== null && liability.amount_received !== undefined ? Number(liability.amount_received) : null,
     createdAt: new Date(liability.created_at),
   }
 }

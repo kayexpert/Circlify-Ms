@@ -43,79 +43,93 @@ export default function BirthdaysContent() {
 
   const isLoading = membersLoading || apiConfigLoading
 
+  // Memoize today's date to avoid recalculating
+  const today = useMemo(() => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    return date
+  }, [])
+  
+  const todayMonth = useMemo(() => today.getMonth(), [today])
+  const todayDate = useMemo(() => today.getDate(), [today])
+  const todayYear = useMemo(() => today.getFullYear(), [today])
+  
   // Calculate today's birthdays
   const todaysBirthdays = useMemo(() => {
-    const today = new Date()
-    const todayMonth = today.getMonth()
-    const todayDate = today.getDate()
-
-    return allMembers
-      .filter((member: any) => {
-        if (!member.date_of_birth) return false
-        const birthDate = new Date(member.date_of_birth + "T00:00:00")
-        return birthDate.getMonth() === todayMonth && birthDate.getDate() === todayDate
-      })
-      .map((member: any) => {
-        const birthDate = new Date(member.date_of_birth! + "T00:00:00")
-        const age = today.getFullYear() - birthDate.getFullYear()
-        return {
+    if (allMembers.length === 0) return []
+    
+    // Use for loop for better performance
+    const results: Birthday[] = []
+    for (let i = 0; i < allMembers.length; i++) {
+      const member = allMembers[i] as any
+      if (!member.date_of_birth) continue
+      
+      const birthDate = new Date(member.date_of_birth + "T00:00:00")
+      if (birthDate.getMonth() === todayMonth && birthDate.getDate() === todayDate) {
+        const age = todayYear - birthDate.getFullYear()
+        results.push({
           id: member.id,
           first_name: member.first_name,
           last_name: member.last_name,
           photo: member.photo,
           age,
-          birthday_date: member.date_of_birth!,
-          role: "Member", // Can be enhanced later
-        } as Birthday
-      })
-  }, [allMembers])
+          birthday_date: member.date_of_birth,
+          role: "Member",
+        } as Birthday)
+      }
+    }
+    return results
+  }, [allMembers, todayMonth, todayDate, todayYear])
 
+  // Memoize daysFromNow to avoid recalculating
+  const daysFromNow = useMemo(() => {
+    const date = new Date(today)
+    date.setDate(today.getDate() + days)
+    return date
+  }, [today, days])
+  
   // Calculate upcoming birthdays (next 30 days)
   const upcomingBirthdays = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const daysFromNow = new Date(today)
-    daysFromNow.setDate(today.getDate() + days)
-
-    return allMembers
-      .filter((member: any) => {
-        if (!member.date_of_birth) return false
-        const birthDate = new Date(member.date_of_birth + "T00:00:00")
-        const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())
-        const nextYearBirthday = new Date(today.getFullYear() + 1, birthDate.getMonth(), birthDate.getDate())
+    if (allMembers.length === 0) return []
+    
+    // Use for loop for better performance
+    const results: Birthday[] = []
+    const todayTime = today.getTime()
+    
+    for (let i = 0; i < allMembers.length; i++) {
+      const member = allMembers[i] as any
+      if (!member.date_of_birth) continue
+      
+      const birthDate = new Date(member.date_of_birth + "T00:00:00")
+      const thisYearBirthday = new Date(todayYear, birthDate.getMonth(), birthDate.getDate())
+      const nextYearBirthday = new Date(todayYear + 1, birthDate.getMonth(), birthDate.getDate())
+      
+      // Get the next occurrence of this birthday
+      let nextBirthday = thisYearBirthday < today ? nextYearBirthday : thisYearBirthday
+      
+      // Don't include today's birthdays (already shown separately)
+      if (nextBirthday.getTime() === todayTime) continue
+      
+      if (nextBirthday >= today && nextBirthday <= daysFromNow) {
+        const daysUntil = Math.ceil((nextBirthday.getTime() - todayTime) / (1000 * 60 * 60 * 24))
+        const age = todayYear - birthDate.getFullYear() + (thisYearBirthday < today ? 1 : 0)
         
-        // Get the next occurrence of this birthday
-        let nextBirthday = thisYearBirthday < today ? nextYearBirthday : thisYearBirthday
-        
-        // Don't include today's birthdays (already shown separately)
-        if (nextBirthday.getTime() === today.getTime()) return false
-        
-        return nextBirthday >= today && nextBirthday <= daysFromNow
-      })
-      .map((member: any) => {
-        const birthDate = new Date(member.date_of_birth! + "T00:00:00")
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())
-        const nextYearBirthday = new Date(today.getFullYear() + 1, birthDate.getMonth(), birthDate.getDate())
-        const nextBirthday = thisYearBirthday < today ? nextYearBirthday : thisYearBirthday
-        
-        const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        const age = today.getFullYear() - birthDate.getFullYear() + (thisYearBirthday < today ? 1 : 0)
-
-        return {
+        results.push({
           id: member.id,
           first_name: member.first_name,
           last_name: member.last_name,
           photo: member.photo,
           age,
-          birthday_date: member.date_of_birth!,
+          birthday_date: member.date_of_birth,
           days_until: daysUntil,
           role: "Member",
-        } as Birthday
-      })
-      .sort((a: any, b: any) => (a.days_until || 0) - (b.days_until || 0))
-  }, [allMembers, days])
+        } as Birthday)
+      }
+    }
+    
+    // Sort by days until
+    return results.sort((a, b) => (a.days_until || 0) - (b.days_until || 0))
+  }, [allMembers, days, today, todayYear, daysFromNow])
 
   // Group birthdays by days until
   const groupedBirthdays = useMemo(() => {

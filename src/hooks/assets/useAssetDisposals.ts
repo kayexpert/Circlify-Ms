@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "../use-organization"
 import { toast } from "sonner"
 import { convertDisposal } from "@/lib/utils/type-converters"
+import { executeWithRollback, createDeleteRollback, createUpdateRollback } from "@/lib/utils/transactions"
 import type { AssetDisposal, AssetDisposalInsert } from "@/types/database-extension"
 import type { DisposalRecord } from "@/app/(dashboard)/dashboard/asset-management/types"
 import type { IncomeRecord } from "@/app/(dashboard)/dashboard/finance/types"
@@ -77,76 +78,128 @@ export function useCreateAssetDisposal() {
         throw new Error("Asset not found")
       }
 
-      // Create income record first
-      const { data: incomeRecord, error: incomeError } = await (supabase
-        .from("finance_income_records") as any)
-        .insert({
-          organization_id: organization.id,
-          account_id: accountId,
-          date: disposalData.date instanceof Date ? disposalData.date.toISOString().split("T")[0] : disposalData.date,
-          source: `Asset Disposal: ${disposalData.assetName}`,
-          category: "Asset Disposal",
-          amount: disposalData.amount,
-          method: disposalData.account,
-          reference: disposalData.description || null,
-          linked_asset_id: assetId,
-        })
-        .select()
-        .single()
+      const previousStatus = (asset as any).status
+      const dateString = disposalData.date instanceof Date 
+        ? disposalData.date.toISOString().split("T")[0] 
+        : disposalData.date
 
-      if (incomeError) {
-        console.error("Error creating income record for disposal:", incomeError)
-        throw new Error("Failed to create income record")
-      }
+      // Store created records for rollback
+      let createdIncomeRecord: any = null
+      let createdDisposalRecord: any = null
 
-      // Create disposal record
-      const { data: disposal, error: disposalError } = await (supabase
-        .from("asset_disposals") as any)
-        .insert({
-          organization_id: organization.id,
-          asset_id: assetId,
-          asset_name: disposalData.assetName,
-          asset_category: disposalData.assetCategory,
-          date: disposalData.date instanceof Date ? disposalData.date.toISOString().split("T")[0] : disposalData.date,
-          account: disposalData.account,
-          account_id: accountId,
-          amount: disposalData.amount,
-          description: disposalData.description || null,
-          linked_income_id: incomeRecord.id,
-        } as AssetDisposalInsert)
-        .select()
-        .single()
+      try {
+        // Step 1: Create income record
+        const { data: incomeRecord, error: incomeError } = await (supabase
+          .from("finance_income_records") as any)
+          .insert({
+            organization_id: organization.id,
+            account_id: accountId,
+            date: dateString,
+            source: `Asset Disposal: ${disposalData.assetName}`,
+            category: "Asset Disposal",
+            amount: disposalData.amount,
+            method: disposalData.account,
+            reference: disposalData.description || null,
+            linked_asset_id: assetId,
+          })
+          .select()
+          .single()
 
-      if (disposalError) {
-        // Rollback: delete the income record if disposal creation fails
-        await supabase.from("finance_income_records").delete().eq("id", incomeRecord.id)
-        console.error("Error creating disposal:", disposalError)
-        throw new Error("Failed to create disposal record")
-      }
+        if (incomeError || !incomeRecord) {
+          throw new Error(incomeError?.message || "Failed to create income record")
+        }
 
-      // Update asset status to "Disposed"
-      await (supabase
-        .from("assets") as any)
-        .update({
-          status: "Disposed",
-          previous_status: (asset as any).status,
-        })
-        .eq("id", assetId)
+        createdIncomeRecord = incomeRecord
 
-      // Account balance is automatically updated by database trigger when income record is created
-      // No need to manually update balance here - this prevents double counting
+        // Step 2: Create disposal record
+        const { data: disposal, error: disposalError } = await (supabase
+          .from("asset_disposals") as any)
+          .insert({
+            organization_id: organization.id,
+            asset_id: assetId,
+            asset_name: disposalData.assetName,
+            asset_category: disposalData.assetCategory,
+            date: dateString,
+            account: disposalData.account,
+            account_id: accountId,
+            amount: disposalData.amount,
+            description: disposalData.description || null,
+            linked_income_id: incomeRecord.id,
+          } as AssetDisposalInsert)
+          .select()
+          .single()
 
-      return {
-        disposal: convertDisposal(disposal),
-        incomeRecord: {
-          id: incomeRecord.id,
-          date: new Date(incomeRecord.date + "T00:00:00"),
-          source: incomeRecord.source,
-          category: incomeRecord.category,
-          amount: Number(incomeRecord.amount),
-          method: incomeRecord.method,
-          reference: incomeRecord.reference || "",
-        } as IncomeRecord,
+        if (disposalError || !disposal) {
+          // Rollback Step 1
+          if (createdIncomeRecord) {
+            await supabase.from("finance_income_records").delete().eq("id", createdIncomeRecord.id)
+          }
+          throw new Error(disposalError?.message || "Failed to create disposal record")
+        }
+
+        createdDisposalRecord = disposal
+
+        // Step 3: Update asset status
+        const { error: updateError } = await (supabase
+          .from("assets") as any)
+          .update({
+            status: "Disposed",
+            previous_status: previousStatus,
+          })
+          .eq("id", assetId)
+
+        if (updateError) {
+          // Rollback Step 1 and Step 2
+          if (createdDisposalRecord) {
+            await supabase.from("asset_disposals").delete().eq("id", createdDisposalRecord.id)
+          }
+          if (createdIncomeRecord) {
+            await supabase.from("finance_income_records").delete().eq("id", createdIncomeRecord.id)
+          }
+          throw new Error(updateError.message || "Failed to update asset status")
+        }
+
+        // Account balance is automatically updated by database trigger when income record is created
+        // No need to manually update balance here - this prevents double counting
+
+        return {
+          disposal: convertDisposal(disposal),
+          incomeRecord: {
+            id: incomeRecord.id,
+            date: new Date(incomeRecord.date + "T00:00:00"),
+            source: incomeRecord.source,
+            category: incomeRecord.category,
+            amount: Number(incomeRecord.amount),
+            method: incomeRecord.method,
+            reference: incomeRecord.reference || "",
+          } as IncomeRecord,
+        }
+      } catch (error) {
+        // Ensure cleanup on any error
+        if (createdDisposalRecord) {
+          try {
+            await supabase.from("asset_disposals").delete().eq("id", createdDisposalRecord.id)
+          } catch (cleanupError) {
+            console.error("Error during cleanup of disposal record:", cleanupError)
+          }
+        }
+        if (createdIncomeRecord) {
+          try {
+            await supabase.from("finance_income_records").delete().eq("id", createdIncomeRecord.id)
+          } catch (cleanupError) {
+            console.error("Error during cleanup of income record:", cleanupError)
+          }
+        }
+        // Restore asset status if it was updated
+        try {
+          await (supabase
+            .from("assets") as any)
+            .update({ status: previousStatus, previous_status: null })
+            .eq("id", assetId)
+        } catch (statusError) {
+          console.error("Error restoring asset status:", statusError)
+        }
+        throw error
       }
     },
     onSuccess: async () => {

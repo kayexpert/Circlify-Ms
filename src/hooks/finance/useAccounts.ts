@@ -205,8 +205,23 @@ export function useUpdateAccount() {
 
       return convertAccount(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate all related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
+      // Force immediate refetch to ensure UI updates
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
       toast.success("Account updated successfully")
     },
     onError: (error: Error | unknown) => {
@@ -247,8 +262,25 @@ export function useDeleteAccount() {
         throw new Error(errorMessage)
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] })
+    onSuccess: async () => {
+      // Invalidate all related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
+      // Force immediate refetch to ensure UI updates
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
       toast.success("Account deleted successfully")
     },
     onError: (error: Error | unknown) => {
@@ -319,8 +351,27 @@ export function useRecalculateAccountBalances() {
       })
 
       if (error) {
-        console.error("Error recalculating balances:", error)
-        throw error
+        console.error("Error recalculating balances:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error
+        })
+        
+        // Extract error message properly
+        let errorMessage = "Failed to recalculate account balances"
+        if (error.message) {
+          errorMessage = error.message
+        } else if (error.details) {
+          errorMessage = error.details
+        } else if (error.hint) {
+          errorMessage = error.hint
+        } else if (error.code) {
+          errorMessage = `Database error: ${error.code}`
+        }
+        
+        throw new Error(errorMessage)
       }
 
       return { recalculated: data?.length || 0 }
@@ -331,9 +382,14 @@ export function useRecalculateAccountBalances() {
       await queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] })
       toast.success(`Recalculated balances for ${result.recalculated} account(s)`)
     },
-    onError: (error: Error) => {
+    onError: (error: Error | unknown) => {
       console.error("Failed to recalculate balances:", error)
-      toast.error(error.message || "Failed to recalculate account balances")
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? String(error.message)
+        : "Failed to recalculate account balances"
+      toast.error(errorMessage)
     },
   })
 }

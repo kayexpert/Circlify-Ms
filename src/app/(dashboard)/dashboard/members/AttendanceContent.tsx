@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import Image from "next/image"
 import type { AttendanceRecord } from "./types"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 
 export default function AttendanceContent() {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
@@ -44,6 +45,8 @@ export default function AttendanceContent() {
   
   // Map to store member number ID to UUID mapping (cached for performance)
   const [memberIdToUUIDMap, setMemberIdToUUIDMap] = useState<Map<number, string>>(new Map())
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [recordToDelete, setRecordToDelete] = useState<{ id: number; uuid: string | null } | null>(null)
 
   const { organization } = useOrganization()
   const supabase = createClient()
@@ -113,8 +116,8 @@ export default function AttendanceContent() {
   const [formData, setFormData] = useState({
     date: '',
     service_type: '',
-    expected_attendance: 0,
-    total_attendance: 0,
+    expected_attendance: "",
+    total_attendance: "",
     men: 0,
     women: 0,
     children: 0,
@@ -128,8 +131,8 @@ export default function AttendanceContent() {
     setFormData({
       date: '',
       service_type: eventsWithAttendance.length > 0 ? eventsWithAttendance[0].name : '',
-      expected_attendance: 0,
-      total_attendance: 0,
+      expected_attendance: "",
+      total_attendance: "",
       men: 0,
       women: 0,
       children: 0,
@@ -153,8 +156,8 @@ export default function AttendanceContent() {
     setFormData({
       date: record.date || '',
       service_type: record.service_type || (eventsWithAttendance.length > 0 ? eventsWithAttendance[0].name : ''),
-      expected_attendance: (record as any).expected_attendance || 0,
-      total_attendance: record.total_attendance || 0,
+      expected_attendance: (record as any).expected_attendance?.toString() || "",
+      total_attendance: record.total_attendance?.toString() || "",
       men: record.men || 0,
       women: record.women || 0,
       children: record.children || 0,
@@ -171,7 +174,7 @@ export default function AttendanceContent() {
       try {
         const { data: memberRecords, error } = await supabase
           .from("member_attendance_records")
-          .select("member_id, date, service_type")
+          .select("member_id, date, service_type, status, notes")
           .eq("organization_id", organization?.id)
           .eq("date", record.date)
           .eq("service_type", record.service_type)
@@ -180,33 +183,40 @@ export default function AttendanceContent() {
           // Build status map from existing records
           const statusMap = new Map<number, 'present' | 'absent'>()
           
-          // Get all member UUIDs that have attendance for this date/service
-          const memberUUIDs = (memberRecords as { member_id: string }[]).map(r => r.member_id)
+          // Get notes from first record (they should all have the same notes)
+          const firstRecord = memberRecords[0] as { notes?: string | null }
+          setCheckInNotes(firstRecord?.notes || "")
           
-          // Convert UUIDs to number IDs and mark as present
+          // Get all member UUIDs with their statuses
+          const memberRecordsWithStatus = memberRecords as { member_id: string; status?: string }[]
+          
+          // Convert UUIDs to number IDs and mark with their status
           // First try using the cache
           for (const [numberId, uuid] of memberIdToUUIDMap.entries()) {
-            if (memberUUIDs.includes(uuid)) {
-              statusMap.set(numberId, 'present')
+            const memberRecord = memberRecordsWithStatus.find(r => r.member_id === uuid)
+            if (memberRecord) {
+              const status = (memberRecord.status === 'absent' ? 'absent' : 'present') as 'present' | 'absent'
+              statusMap.set(numberId, status)
             }
           }
           
           // For any UUIDs not found in cache, query directly
           const foundUUIDs = Array.from(statusMap.keys()).map(id => memberIdToUUIDMap.get(id)).filter(Boolean) as string[]
-          const missingUUIDs = memberUUIDs.filter(uuid => !foundUUIDs.includes(uuid))
+          const missingRecords = memberRecordsWithStatus.filter(r => !foundUUIDs.includes(r.member_id))
           
-          for (const memberUUID of missingUUIDs) {
+          for (const memberRecord of missingRecords) {
             const { data: memberData } = await supabase
               .from("members")
               .select("id")
-              .eq("id", memberUUID)
+              .eq("id", memberRecord.member_id)
               .eq("organization_id", organization.id)
               .single()
             
             if (memberData) {
               const numberId = parseInt((memberData as { id: string }).id.replace(/-/g, "").substring(0, 8), 16) || 0
               if (numberId > 0) {
-                statusMap.set(numberId, 'present')
+                const status = (memberRecord.status === 'absent' ? 'absent' : 'present') as 'present' | 'absent'
+                statusMap.set(numberId, status)
                 // Also add to cache for future use
                 setMemberIdToUUIDMap(prev => new Map(prev).set(numberId, (memberData as { id: string }).id))
               }
@@ -215,12 +225,17 @@ export default function AttendanceContent() {
           
           setMemberAttendanceStatus(statusMap)
         } else {
-          // No member records found, clear status
+          // No member records found, clear status and notes
           setMemberAttendanceStatus(new Map())
+          setCheckInNotes("")
         }
       } catch (error) {
         console.error("Error loading member attendance records:", error)
+        setCheckInNotes("")
       }
+    } else {
+      // Reset notes if no record
+      setCheckInNotes("")
     }
     
     setIsSheetOpen(true)
@@ -251,8 +266,8 @@ export default function AttendanceContent() {
           id: selectedRecordUUID,
           date: formData.date,
           service_type: formData.service_type,
-          expected_attendance: formData.expected_attendance,
-          total_attendance: formData.total_attendance,
+          expected_attendance: formData.expected_attendance === "" ? 0 : parseInt(formData.expected_attendance) || 0,
+          total_attendance: parseInt(formData.total_attendance) || 0,
           men: formData.men,
           women: formData.women,
           children: formData.children,
@@ -264,8 +279,8 @@ export default function AttendanceContent() {
         await createRecord.mutateAsync({
           date: formData.date,
           service_type: formData.service_type,
-          expected_attendance: formData.expected_attendance,
-          total_attendance: formData.total_attendance,
+          expected_attendance: formData.expected_attendance === "" ? 0 : parseInt(formData.expected_attendance) || 0,
+          total_attendance: parseInt(formData.total_attendance) || 0,
           men: formData.men,
           women: formData.women,
           children: formData.children,
@@ -287,7 +302,7 @@ export default function AttendanceContent() {
     e.preventDefault()
     
     // First save general attendance
-    if (!formData.date || !formData.service_type || !formData.total_attendance) {
+    if (!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === "") {
       toast.error("Please fill in all required fields in the General tab")
       return
     }
@@ -303,8 +318,8 @@ export default function AttendanceContent() {
           id: selectedRecordUUID!,
           date: formData.date,
           service_type: formData.service_type,
-          expected_attendance: formData.expected_attendance,
-          total_attendance: formData.total_attendance,
+          expected_attendance: formData.expected_attendance === "" ? 0 : parseInt(formData.expected_attendance) || 0,
+          total_attendance: parseInt(formData.total_attendance) || 0,
           men: formData.men,
           women: formData.women,
           children: formData.children,
@@ -315,8 +330,8 @@ export default function AttendanceContent() {
         await createRecord.mutateAsync({
           date: formData.date,
           service_type: formData.service_type,
-          expected_attendance: formData.expected_attendance,
-          total_attendance: formData.total_attendance,
+          expected_attendance: formData.expected_attendance === "" ? 0 : parseInt(formData.expected_attendance) || 0,
+          total_attendance: parseInt(formData.total_attendance) || 0,
           men: formData.men,
           women: formData.women,
           children: formData.children,
@@ -325,10 +340,8 @@ export default function AttendanceContent() {
         } as any)
       }
 
-      // Handle member check-ins
-      const presentMemberIds = Array.from(memberAttendanceStatus.entries())
-        .filter(([_, status]) => status === 'present')
-        .map(([numberId]) => numberId)
+      // Handle member check-ins - save both present and absent members
+      const allMemberStatuses = Array.from(memberAttendanceStatus.entries())
 
       // If updating and date/service changed, delete old member attendance records
       if (isUpdate && oldDate && oldServiceType && (oldDate !== formData.date || oldServiceType !== formData.service_type) && organization?.id) {
@@ -375,23 +388,23 @@ export default function AttendanceContent() {
         }
       }
 
-      // Create new member check-ins
-      if (presentMemberIds.length > 0) {
+      // Create new member check-ins - save both present and absent members
+      if (allMemberStatuses.length > 0) {
         const selectedEvent = eventsWithAttendance.find(e => e.name === formData.service_type)
         
-        const validUUIDs: string[] = []
-        for (const numberId of presentMemberIds) {
+        const memberStatusMap = new Map<string, 'present' | 'absent'>()
+        for (const [numberId, status] of allMemberStatuses) {
           const uuid = getMemberUUIDFromNumberId(numberId)
           if (uuid) {
-            validUUIDs.push(uuid)
+            memberStatusMap.set(uuid, status)
           }
         }
         
-        if (validUUIDs.length > 0) {
+        if (memberStatusMap.size > 0) {
           const results = []
           const errors = []
           
-          for (const memberUUID of validUUIDs) {
+          for (const [memberUUID, status] of memberStatusMap.entries()) {
             try {
               await createMemberAttendance.mutateAsync({
                 member_id: memberUUID,
@@ -399,10 +412,11 @@ export default function AttendanceContent() {
                 service_type: formData.service_type,
                 event_id: selectedEvent?.id || null,
                 notes: checkInNotes || null,
+                status: status,
               })
               results.push(memberUUID)
             } catch (error: any) {
-              console.error(`Failed to check in member ${memberUUID}:`, error)
+              console.error(`Failed to record attendance for member ${memberUUID}:`, error)
               errors.push({ memberUUID, error: error.message || "Unknown error" })
             }
           }
@@ -412,11 +426,11 @@ export default function AttendanceContent() {
           }
           
           if (errors.length > 0) {
-            console.warn(`Failed to check in ${errors.length} member(s):`, errors)
-            if (errors.length === validUUIDs.length) {
+            console.warn(`Failed to record attendance for ${errors.length} member(s):`, errors)
+            if (errors.length === memberStatusMap.size) {
               throw new Error(`Failed to record attendance for all members. They may already be checked in for this event.`)
             } else {
-              toast.warning(`${errors.length} member(s) could not be checked in. They may already be checked in for this event.`)
+              toast.warning(`${errors.length} member(s) could not be recorded. They may already be checked in for this event.`)
             }
           }
         }
@@ -433,8 +447,66 @@ export default function AttendanceContent() {
     }
   }
 
+  // Memoize today's date to avoid recalculating
+  const today = useMemo(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }, [])
+  
+  // Memoize period boundaries
+  const periodBoundaries = useMemo(() => {
+    if (selectedPeriod === "all") return null
+    
+    const todayYear = today.getFullYear()
+    const todayMonth = today.getMonth()
+    
+    switch (selectedPeriod) {
+      case "week": {
+        const dayOfWeek = today.getDay()
+        const monday = new Date(today)
+        monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+        monday.setHours(0, 0, 0, 0)
+        const sunday = new Date(monday)
+        sunday.setDate(monday.getDate() + 6)
+        sunday.setHours(23, 59, 59, 999)
+        return { start: monday, end: sunday }
+      }
+      case "month": {
+        return {
+          start: new Date(todayYear, todayMonth, 1),
+          end: new Date(todayYear, todayMonth + 1, 0, 23, 59, 59, 999)
+        }
+      }
+      case "quarter": {
+        const quarter = Math.floor(todayMonth / 3)
+        return {
+          start: new Date(todayYear, quarter * 3, 1),
+          end: new Date(todayYear, (quarter + 1) * 3, 0, 23, 59, 59, 999)
+        }
+      }
+      case "year": {
+        return {
+          start: new Date(todayYear, 0, 1),
+          end: new Date(todayYear, 11, 31, 23, 59, 59, 999)
+        }
+      }
+      default:
+        return null
+    }
+  }, [selectedPeriod, today])
+  
   // Filter records by service type and time period
   const filteredRecords = useMemo(() => {
+    // Early returns for no filters
+    if (selectedServiceType === "all" && selectedPeriod === "all") {
+      // Just sort and return
+      return [...allRecords].sort((a, b) => {
+        const dateA = new Date(a.date + "T00:00:00")
+        const dateB = new Date(b.date + "T00:00:00")
+        return dateB.getTime() - dateA.getTime()
+      })
+    }
+    
     let filtered = allRecords
 
     // Filter by service type
@@ -442,51 +514,14 @@ export default function AttendanceContent() {
       filtered = filtered.filter(r => r.service_type === selectedServiceType)
     }
 
-      // Filter by time period
-      if (selectedPeriod !== "all") {
-        const now = new Date()
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        
-        filtered = filtered.filter(record => {
-          if (!record.date) return false
-          const recordDate = new Date(record.date + "T00:00:00")
-          
-          switch (selectedPeriod) {
-            case "week": {
-          // This week (Monday to Sunday)
-          const dayOfWeek = today.getDay()
-          const monday = new Date(today)
-          monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-          monday.setHours(0, 0, 0, 0)
-          const sunday = new Date(monday)
-          sunday.setDate(monday.getDate() + 6)
-          sunday.setHours(23, 59, 59, 999)
-          return recordDate >= monday && recordDate <= sunday
-        }
-        case "month": {
-          // This month
-          const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
-        }
-        case "quarter": {
-          // This quarter
-          const quarter = Math.floor(today.getMonth() / 3)
-          const firstDay = new Date(today.getFullYear(), quarter * 3, 1)
-          const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999)
-          return recordDate >= firstDay && recordDate <= lastDay
-        }
-            case "year": {
-              // This year
-              const firstDay = new Date(today.getFullYear(), 0, 1)
-              const lastDay = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999)
-              return recordDate >= firstDay && recordDate <= lastDay
-            }
-            default:
-              return true
-          }
-        })
-      }
+    // Filter by time period
+    if (periodBoundaries) {
+      filtered = filtered.filter(record => {
+        if (!record.date) return false
+        const recordDate = new Date(record.date + "T00:00:00")
+        return recordDate >= periodBoundaries.start && recordDate <= periodBoundaries.end
+      })
+    }
 
     // Sort by date descending
     return filtered.sort((a, b) => {
@@ -494,7 +529,7 @@ export default function AttendanceContent() {
       const dateB = new Date(b.date + "T00:00:00")
       return dateB.getTime() - dateA.getTime()
     })
-  }, [allRecords, selectedServiceType, selectedPeriod])
+  }, [allRecords, selectedServiceType, periodBoundaries])
 
   // Calculate stats based on filtered records
   const stats = useMemo(() => [
@@ -526,23 +561,39 @@ export default function AttendanceContent() {
 
 
 
-  // Filter members for check-in
+  // Filter members for check-in - optimized with early return
+  const memberSearchQueryLower = useMemo(() => memberSearchQuery.toLowerCase(), [memberSearchQuery])
   const filteredMembers = useMemo(() => {
-    if (!memberSearchQuery) return members
-    const query = memberSearchQuery.toLowerCase()
-    return members.filter((m: any) =>
-      `${m.first_name} ${m.last_name}`.toLowerCase().includes(query) ||
-      m.phone_number?.toLowerCase().includes(query) ||
-      m.email?.toLowerCase().includes(query)
-    )
-  }, [members, memberSearchQuery])
+    if (!memberSearchQueryLower) return members
+    
+    // Use for loop for better performance with large member lists
+    const results: typeof members = []
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i] as any
+      const fullName = `${m.first_name} ${m.last_name}`.toLowerCase()
+      if (fullName.includes(memberSearchQueryLower) ||
+          m.phone_number?.toLowerCase().includes(memberSearchQueryLower) ||
+          m.email?.toLowerCase().includes(memberSearchQueryLower)) {
+        results.push(m)
+      }
+    }
+    return results
+  }, [members, memberSearchQueryLower])
 
 
   // Optimized: Pre-load all member UUIDs when members are loaded
+  // Only run when members count changes, not on every render
+  const membersLength = useMemo(() => members.length, [members.length])
+  
   useEffect(() => {
     const loadMemberUUIDs = async () => {
-      if (!organization?.id || members.length === 0) {
+      if (!organization?.id || membersLength === 0) {
         return
+      }
+
+      // Check if we already have all UUIDs cached
+      if (memberIdToUUIDMap.size >= membersLength) {
+        return // Already loaded
       }
 
       try {
@@ -557,12 +608,14 @@ export default function AttendanceContent() {
         // Build map of number ID to UUID
         setMemberIdToUUIDMap(prev => {
           const newMap = new Map(prev) // Start with existing cache
-          data.forEach((m: { id: string }) => {
+          // Only add new entries, skip if already exists
+          for (let i = 0; i < data.length; i++) {
+            const m = data[i] as { id: string }
             const numberId = parseInt(m.id.replace(/-/g, "").substring(0, 8), 16) || 0
             if (numberId > 0 && !newMap.has(numberId)) {
               newMap.set(numberId, m.id)
             }
-          })
+          }
           return newMap
         })
       } catch (error) {
@@ -571,7 +624,7 @@ export default function AttendanceContent() {
     }
 
     loadMemberUUIDs()
-  }, [members.length, organization?.id, supabase]) // Only depend on length, not the array itself
+  }, [membersLength, organization?.id, supabase, memberIdToUUIDMap.size]) // Only depend on length, not the array itself
 
   // Get member UUID from number ID (uses cache)
   const getMemberUUIDFromNumberId = (numberId: number): string | null => {
@@ -747,42 +800,21 @@ export default function AttendanceContent() {
                               size="sm" 
                               variant="destructive" 
                               onClick={async () => {
-                                if (!confirm("Are you sure you want to delete this attendance record? This will also delete all member check-ins for this record.")) {
+                                const recordUUID = await getAttendanceRecordUUID(record.id)
+                                if (!recordUUID) {
+                                  toast.error("Could not find record UUID")
                                   return
                                 }
-                                try {
-                                  const recordUUID = await getAttendanceRecordUUID(record.id)
-                                  if (!recordUUID) {
-                                    toast.error("Could not find record UUID")
-                                    return
-                                  }
-
-                                  // Delete member attendance records first
-                                  const { data: memberRecords } = await supabase
-                                    .from("member_attendance_records")
-                                    .select("id, member_id")
-                                    .eq("organization_id", organization!.id)
-                                    .eq("date", record.date)
-                                    .eq("service_type", record.service_type)
-
-                                  if (memberRecords && memberRecords.length > 0) {
-                                    for (const memberRecord of memberRecords as { id: string; member_id: string }[]) {
-                                      await deleteMemberAttendance.mutateAsync({
-                                        id: memberRecord.id,
-                                        memberId: memberRecord.member_id,
-                                      })
-                                    }
-                                  }
-
-                                  // Then delete the general attendance record
-                                  await deleteRecord.mutateAsync(recordUUID)
-                                } catch (error) {
-                                  console.error("Error deleting attendance record:", error)
-                                }
+                                setRecordToDelete({ id: record.id, uuid: recordUUID })
+                                setDeleteDialogOpen(true)
                               }}
-                              disabled={createRecord.isPending || updateRecord.isPending || deleteRecord.isPending}
+                              disabled={deleteRecord.isPending}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {deleteRecord.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -791,8 +823,28 @@ export default function AttendanceContent() {
                   )}
                 </TableBody>
               </Table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={async () => {
+          if (!recordToDelete?.uuid) return
+          try {
+            await deleteRecord.mutateAsync(recordToDelete.uuid)
+            setDeleteDialogOpen(false)
+            setRecordToDelete(null)
+          } catch (error) {
+            console.error("Error deleting attendance record:", error)
+          }
+        }}
+        title="Delete Attendance Record"
+        description="Are you sure you want to delete this attendance record? This will also delete all member check-ins for this record."
+        confirmText="Delete"
+        isLoading={deleteRecord.isPending}
+      />
 
       {/* Form Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -836,7 +888,9 @@ export default function AttendanceContent() {
                 </SelectTrigger>
                 <SelectContent className="z-[110]">
                   {eventsWithAttendance.length === 0 ? (
-                    <SelectItem value="" disabled>No events with attendance tracking enabled</SelectItem>
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      No events with attendance tracking enabled
+                    </div>
                   ) : (
                     eventsWithAttendance.map((event) => (
                       <SelectItem key={event.id} value={event.name}>
@@ -850,7 +904,7 @@ export default function AttendanceContent() {
           </div>
           
           <Tabs value={activeAttendanceTab} onValueChange={(v) => {
-            if (v === "member-checkin" && !formData.date && !formData.service_type && !formData.total_attendance) {
+            if (v === "member-checkin" && (!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === "")) {
               toast.error("Please fill in the General tab first")
               return
             }
@@ -858,7 +912,7 @@ export default function AttendanceContent() {
           }} className="mt-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="member-checkin" disabled={!formData.date || !formData.service_type || !formData.total_attendance}>Member Check In</TabsTrigger>
+              <TabsTrigger value="member-checkin" disabled={!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === ""}>Member Check In</TabsTrigger>
             </TabsList>
 
             {/* General Tab */}
@@ -872,7 +926,7 @@ export default function AttendanceContent() {
                       id="expected_attendance" 
                       type="number" 
                       value={formData.expected_attendance} 
-                      onChange={(e) => setFormData({ ...formData, expected_attendance: parseInt(e.target.value) || 0 })} 
+                      onChange={(e) => setFormData({ ...formData, expected_attendance: e.target.value })} 
                       disabled={createRecord.isPending || updateRecord.isPending}
                     />
                   </div>
@@ -882,7 +936,7 @@ export default function AttendanceContent() {
                       id="total_attendance" 
                       type="number" 
                       value={formData.total_attendance} 
-                      onChange={(e) => setFormData({ ...formData, total_attendance: parseInt(e.target.value) || 0 })} 
+                      onChange={(e) => setFormData({ ...formData, total_attendance: e.target.value })} 
                       required
                       disabled={createRecord.isPending || updateRecord.isPending}
                     />
@@ -992,7 +1046,7 @@ export default function AttendanceContent() {
 
             {/* Member Check In Tab */}
             <TabsContent value="member-checkin" className="space-y-4 mt-4">
-              {!formData.date || !formData.service_type || !formData.total_attendance ? (
+              {!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === "" ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p className="mb-2">Please fill in the General tab first</p>
                   <p className="text-sm">Date, Event, and Total Attendance are required</p>
@@ -1064,7 +1118,7 @@ export default function AttendanceContent() {
                                 >
                                   <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <div className="relative h-10 w-10 rounded-full overflow-hidden flex-shrink-0 bg-muted">
-                                      {member.photo ? (
+                                      {member.photo && !member.photo.startsWith('data:') ? (
                                         <Image
                                           src={member.photo}
                                           alt={`${member.first_name} ${member.last_name}`}

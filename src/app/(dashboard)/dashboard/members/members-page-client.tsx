@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, lazy, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import React, { useState, useEffect, lazy, Suspense, useCallback } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LayoutDashboard, Users, UserPlus, CalendarDays, Cake, Network, MessageSquare } from "lucide-react"
 import { CompactLoader } from "@/components/ui/loader"
@@ -15,20 +15,46 @@ const FollowUpContent = lazy(() => import("./FollowUpContent").then(m => ({ defa
 const BirthdaysContent = lazy(() => import("./BirthdaysContent").then(m => ({ default: m.default })))
 const GroupsDepartmentsContent = lazy(() => import("./GroupsDepartmentsContent").then(m => ({ default: m.default })))
 
+const VALID_TABS = ["overview", "members", "visitors", "attendance", "follow-up", "birthdays", "groups-departments"] as const
+
 export function MembersPageClient() {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
-  const [activeTab, setActiveTab] = useState(tabParam || "overview")
+  const [activeTab, setActiveTab] = useState<string>(tabParam && VALID_TABS.includes(tabParam as any) ? tabParam : "overview")
 
-  // Update tab when URL parameter changes
+  // Update tab when URL parameter changes - memoized to prevent unnecessary updates
   useEffect(() => {
-    if (tabParam && ["overview", "members", "visitors", "attendance", "follow-up", "birthdays", "groups-departments"].includes(tabParam)) {
-      setActiveTab(tabParam)
+    if (tabParam && VALID_TABS.includes(tabParam as any)) {
+      if (activeTab !== tabParam) {
+        setActiveTab(tabParam)
+      }
+    } else if (!tabParam && activeTab !== "overview") {
+      // If no tab param, default to overview
+      setActiveTab("overview")
     }
-  }, [tabParam])
+  }, [tabParam, activeTab])
+
+  // Handle tab change - update both state and URL
+  const handleTabChange = useCallback((value: string) => {
+    if (VALID_TABS.includes(value as any)) {
+      setActiveTab(value)
+      // Update URL without causing a full page reload
+      const params = new URLSearchParams(searchParams.toString())
+      if (value === "overview") {
+        // Remove tab param for overview (default tab)
+        params.delete("tab")
+      } else {
+        params.set("tab", value)
+      }
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      router.replace(newUrl, { scroll: false })
+    }
+  }, [router, pathname, searchParams])
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-7 lg:w-[1050px] mb-6">
         <TabsTrigger value="overview" className="flex items-center gap-2">
           <LayoutDashboard className="h-4 w-4" />
@@ -62,51 +88,65 @@ export function MembersPageClient() {
 
       {/* Overview Tab - Lazy loaded, only renders when active */}
       <TabsContent value="overview" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "overview" && <OverviewContent />}
-        </Suspense>
+        {activeTab === "overview" && (
+          <Suspense fallback={<CompactLoader />}>
+            <OverviewContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Members Tab - Lazy loaded, only renders when active */}
       <TabsContent value="members" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "members" && <MembersContent />}
-        </Suspense>
+        {activeTab === "members" && (
+          <Suspense fallback={<CompactLoader />}>
+            <MembersContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Visitors Tab - Lazy loaded, only renders when active */}
       <TabsContent value="visitors" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "visitors" && <VisitorsContent />}
-        </Suspense>
+        {activeTab === "visitors" && (
+          <Suspense fallback={<CompactLoader />}>
+            <VisitorsContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Attendance Tab - Lazy loaded, only renders when active */}
       <TabsContent value="attendance" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "attendance" && <AttendanceContent />}
-        </Suspense>
+        {activeTab === "attendance" && (
+          <Suspense fallback={<CompactLoader />}>
+            <AttendanceContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Follow Up Tab - Lazy loaded, only renders when active */}
       <TabsContent value="follow-up" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "follow-up" && <FollowUpContent />}
-        </Suspense>
+        {activeTab === "follow-up" && (
+          <Suspense fallback={<CompactLoader />}>
+            <FollowUpContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Birthdays Tab - Lazy loaded, only renders when active */}
       <TabsContent value="birthdays" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "birthdays" && <BirthdaysContent />}
-        </Suspense>
+        {activeTab === "birthdays" && (
+          <Suspense fallback={<CompactLoader />}>
+            <BirthdaysContent />
+          </Suspense>
+        )}
       </TabsContent>
 
       {/* Groups & Departments Tab - Lazy loaded, only renders when active */}
       <TabsContent value="groups-departments" className="mt-0">
-        <Suspense fallback={<CompactLoader />}>
-          {activeTab === "groups-departments" && <GroupsDepartmentsContent />}
-        </Suspense>
+        {activeTab === "groups-departments" && (
+          <Suspense fallback={<CompactLoader />}>
+            <GroupsDepartmentsContent />
+          </Suspense>
+        )}
       </TabsContent>
     </Tabs>
   )

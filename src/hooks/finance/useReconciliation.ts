@@ -181,28 +181,75 @@ export function useCreateReconciliation() {
         throw error
       }
 
-      // Update income and expenditure records to mark them as reconciled
-      if (reconciledIncomeEntryUUIDs.length > 0 && data) {
-        await (supabase
-          .from("finance_income_records") as any)
-          .update({
-            is_reconciled: true,
-            reconciled_in_reconciliation: (data as FinanceReconciliationRecord).id,
-          } as FinanceIncomeRecordUpdate)
-          .in("id", reconciledIncomeEntryUUIDs)
-      }
+      // Store reconciliation ID for rollback
+      const reconciliationId = (data as FinanceReconciliationRecord).id
+      const updatedIncomeIds: string[] = []
+      const updatedExpenditureIds: string[] = []
 
-      if (reconciledExpenditureEntryUUIDs.length > 0 && data) {
-        await (supabase
-          .from("finance_expenditure_records") as any)
-          .update({
-            is_reconciled: true,
-            reconciled_in_reconciliation: (data as FinanceReconciliationRecord).id,
-          } as FinanceExpenditureRecordUpdate)
-          .in("id", reconciledExpenditureEntryUUIDs)
-      }
+      try {
+        // Update income and expenditure records to mark them as reconciled
+        if (reconciledIncomeEntryUUIDs.length > 0 && data) {
+          const { error: incomeUpdateError } = await (supabase
+            .from("finance_income_records") as any)
+            .update({
+              is_reconciled: true,
+              reconciled_in_reconciliation: reconciliationId,
+            } as FinanceIncomeRecordUpdate)
+            .in("id", reconciledIncomeEntryUUIDs)
 
-      return convertReconciliation(data)
+          if (incomeUpdateError) {
+            throw new Error(`Failed to update income records: ${incomeUpdateError.message}`)
+          }
+          updatedIncomeIds.push(...reconciledIncomeEntryUUIDs)
+        }
+
+        if (reconciledExpenditureEntryUUIDs.length > 0 && data) {
+          const { error: expenditureUpdateError } = await (supabase
+            .from("finance_expenditure_records") as any)
+            .update({
+              is_reconciled: true,
+              reconciled_in_reconciliation: reconciliationId,
+            } as FinanceExpenditureRecordUpdate)
+            .in("id", reconciledExpenditureEntryUUIDs)
+
+          if (expenditureUpdateError) {
+            throw new Error(`Failed to update expenditure records: ${expenditureUpdateError.message}`)
+          }
+          updatedExpenditureIds.push(...reconciledExpenditureEntryUUIDs)
+        }
+
+        return convertReconciliation(data)
+      } catch (updateError) {
+        // Rollback: delete reconciliation record if updates fail
+        await supabase
+          .from("finance_reconciliation_records")
+          .delete()
+          .eq("id", reconciliationId)
+
+        // Rollback: unmark income records
+        if (updatedIncomeIds.length > 0) {
+          await (supabase
+            .from("finance_income_records") as any)
+            .update({
+              is_reconciled: false,
+              reconciled_in_reconciliation: null,
+            })
+            .in("id", updatedIncomeIds)
+        }
+
+        // Rollback: unmark expenditure records
+        if (updatedExpenditureIds.length > 0) {
+          await (supabase
+            .from("finance_expenditure_records") as any)
+            .update({
+              is_reconciled: false,
+              reconciled_in_reconciliation: null,
+            })
+            .in("id", updatedExpenditureIds)
+        }
+
+        throw updateError
+      }
     },
     onSuccess: async () => {
       // Invalidate all related queries (both main and paginated)
@@ -213,6 +260,20 @@ export function useCreateReconciliation() {
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
+      // Force immediate refetch to ensure UI updates
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Reconciliation record created successfully")
     },
@@ -366,6 +427,20 @@ export function useUpdateReconciliation() {
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
+      // Force immediate refetch to ensure UI updates
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Reconciliation record updated successfully")
     },
@@ -441,6 +516,20 @@ export function useDeleteReconciliation() {
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
+      // Force immediate refetch to ensure UI updates
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_reconciliation_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Reconciliation record deleted successfully")
     },

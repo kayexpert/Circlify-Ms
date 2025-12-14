@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     const isEmailConfirmation = type === 'signup' || type === 'email' || type === 'recovery'
     
     // Also check if user has an organization_users link
-    // If they don't, they likely just confirmed email and should sign in
+    // If they don't, they likely just confirmed email and should set up organization
     const { data: orgUsers } = await supabase
       .from('organization_users')
       .select('id')
@@ -46,14 +46,21 @@ export async function GET(request: Request) {
 
     const hasOrganization = orgUsers && orgUsers.length > 0
 
-    // For email confirmations, always redirect to signin
-    // User needs to sign in after confirming their email
-    if (isEmailConfirmation || !hasOrganization) {
+    // For signup email confirmations, redirect to setup-organization if they don't have one
+    if (type === 'signup' && !hasOrganization) {
+      return NextResponse.redirect(new URL('/setup-organization', origin))
+    }
+
+    // For password recovery, always redirect to signin
+    if (type === 'recovery') {
       const signInUrl = new URL('/signin', origin)
-      if (isEmailConfirmation || type === 'signup') {
-        signInUrl.searchParams.set('confirmed', 'true')
-      }
+      signInUrl.searchParams.set('confirmed', 'true')
       return NextResponse.redirect(signInUrl)
+    }
+
+    // For other email confirmations without organization, redirect to setup-organization
+    if (isEmailConfirmation && !hasOrganization && type !== 'recovery') {
+      return NextResponse.redirect(new URL('/setup-organization', origin))
     }
 
     // For OAuth flows where user has organization, redirect to dashboard

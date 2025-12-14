@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -14,6 +15,12 @@ const nextConfig: NextConfig = {
         hostname: 'images.unsplash.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
       },
     ],
   },
@@ -87,4 +94,31 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Make sure adding Sentry options is the last code to run before exporting
+export default withSentryConfig(
+  nextConfig,
+  {
+    // For all available options, see:
+    // https://github.com/getsentry/sentry-webpack-plugin#options
+
+    // Suppresses source map uploading logs during build
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    
+    // For all available options, see:
+    // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+
+    // Automatically instrument Next.js to capture:
+    // - HTTP requests
+    // - Server components
+    // - API routes
+    // - Middleware
+    // - Edge runtime
+    widenClientFileUpload: true,
+
+    // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+    // Can be disabled if you are not planning to use Sentry to track client-side performance.
+    tunnelRoute: "/monitoring",
+  }
+);

@@ -236,7 +236,7 @@ export default function SetupOrganizationPage() {
 
       // Use the database function to create organization (bypasses RLS)
       // This function handles organization creation, user linking, and created_by setting
-      const { data: orgData, error: orgError } = await supabase.rpc('create_organization', {
+      const { data: orgData, error: orgError } = await (supabase.rpc as any)('create_organization', {
         p_name: orgInsert.name,
         p_slug: orgInsert.slug,
         p_type: orgInsert.type,

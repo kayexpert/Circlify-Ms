@@ -237,18 +237,15 @@ Deno.serve(async (req) => {
       console.log(`[BIRTHDAY-CRON] Processing organization: ${orgName} (${orgId})`)
 
       try {
-        // Find members with birthdays today
-        console.log(`[BIRTHDAY-CRON] [${orgName}] Fetching active members...`)
-        const { data: members, error: membersError } = await supabase
-          .from("members")
-          .select("id, first_name, last_name, phone_number, date_of_birth")
-          .eq("organization_id", orgId)
-          .eq("membership_status", "active")
-          .not("date_of_birth", "is", null)
-          .not("phone_number", "is", null)
+        // Find members with birthdays today using optimized database function
+        console.log(`[BIRTHDAY-CRON] [${orgName}] Fetching members with birthdays today...`)
+        const { data: birthdayMembers, error: membersError } = await supabase.rpc(
+          "get_members_with_birthday_today",
+          { p_organization_id: orgId }
+        )
 
         if (membersError) {
-          const errorMsg = `Error fetching members for org ${orgId}: ${JSON.stringify(membersError)}`
+          const errorMsg = `Error fetching birthday members for org ${orgId}: ${JSON.stringify(membersError)}`
           console.error(`[BIRTHDAY-CRON] [${orgName}] ERROR:`, errorMsg)
           
           if (executionLogId) {
@@ -259,7 +256,7 @@ Deno.serve(async (req) => {
               "query_failure",
               errorMsg,
               membersError.stack || undefined,
-              { step: "fetch_members", organization_id: orgId, organization_name: orgName }
+              { step: "fetch_birthday_members", organization_id: orgId, organization_name: orgName }
             )
           }
           
@@ -268,49 +265,7 @@ Deno.serve(async (req) => {
           continue
         }
 
-        console.log(`[BIRTHDAY-CRON] [${orgName}] Found ${members?.length || 0} active members with DOB and phone`)
-
-        if (!members || members.length === 0) {
-          console.log(`[BIRTHDAY-CRON] [${orgName}] No members to process`)
-          continue
-        }
-
-        // Filter members with birthdays today
-        console.log(`[BIRTHDAY-CRON] [${orgName}] Filtering members with birthdays on ${todayDateString}...`)
-        const birthdayMembers = members.filter((member: any) => {
-          if (!member.date_of_birth) return false
-          
-          try {
-            // Parse date of birth - handle different formats
-            let birthDate: Date
-            if (member.date_of_birth.includes("T")) {
-              birthDate = new Date(member.date_of_birth)
-            } else {
-              // Assume YYYY-MM-DD format, create date in UTC
-              birthDate = new Date(member.date_of_birth + "T00:00:00Z")
-            }
-            
-            // Compare month and date in UTC
-            const birthMonth = birthDate.getUTCMonth() + 1
-            const birthDateNum = birthDate.getUTCDate()
-            
-            const isBirthday = birthMonth === todayMonth && birthDateNum === todayDate
-            
-            if (isBirthday) {
-              console.log(`[BIRTHDAY-CRON] [${orgName}] Found birthday member: ${member.first_name} ${member.last_name} (DOB: ${member.date_of_birth})`)
-            }
-            
-            return isBirthday
-          } catch (dateError) {
-            console.error(`[BIRTHDAY-CRON] [${orgName}] Error parsing date for member ${member.id}:`, {
-              date_of_birth: member.date_of_birth,
-              error: dateError,
-            })
-            return false
-          }
-        })
-
-        console.log(`[BIRTHDAY-CRON] [${orgName}] Found ${birthdayMembers.length} members with birthdays today`)
+        console.log(`[BIRTHDAY-CRON] [${orgName}] Found ${birthdayMembers?.length || 0} members with birthdays today`)
 
         if (birthdayMembers.length === 0) {
           console.log(`[BIRTHDAY-CRON] [${orgName}] No birthday members to process`)

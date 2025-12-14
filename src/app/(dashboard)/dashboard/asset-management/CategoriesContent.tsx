@@ -11,10 +11,13 @@ import { Edit, Trash2, Search, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useAssetCategories, useCreateAssetCategory, useUpdateAssetCategory, useDeleteAssetCategory } from "@/hooks/assets"
 import type { AssetCategory } from "./types"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 
 export default function CategoriesContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [editingCategory, setEditingCategory] = useState<AssetCategory | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<AssetCategory | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -84,18 +87,22 @@ export default function CategoriesContent() {
     }
   }
 
-  const handleDelete = async (category: AssetCategory) => {
-    if (!confirm("Are you sure you want to delete this category? This action cannot be undone.")) {
-      return
-    }
-
+  const handleDeleteClick = (category: AssetCategory) => {
     if (!category.uuid) {
       toast.error("Category not found")
       return
     }
+    setCategoryToDelete(category)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete?.uuid) return
 
     try {
-      await deleteCategory.mutateAsync(category.uuid)
+      await deleteCategory.mutateAsync(categoryToDelete.uuid)
+      setDeleteDialogOpen(false)
+      setCategoryToDelete(null)
     } catch (error) {
       // Error is already handled by the hook (toast)
       console.error("Error deleting category:", error)
@@ -103,11 +110,12 @@ export default function CategoriesContent() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Asset Categories</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Asset Categories</CardTitle>
+        </CardHeader>
+        <CardContent>
         {/* Add/Edit Form */}
         <form onSubmit={handleSubmit} className="mb-4 p-4 border rounded-lg bg-muted/50">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-4 items-end">
@@ -219,7 +227,7 @@ export default function CategoriesContent() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(category)}
+                            onClick={() => handleDeleteClick(category)}
                             disabled={deleteCategory.isPending || createCategory.isPending || updateCategory.isPending}
                           >
                             {deleteCategory.isPending ? (
@@ -239,5 +247,17 @@ export default function CategoriesContent() {
         </div>
       </CardContent>
     </Card>
+
+    {/* Delete Confirmation Dialog */}
+    <DeleteConfirmationDialog
+      open={deleteDialogOpen}
+      onOpenChange={setDeleteDialogOpen}
+      onConfirm={handleDeleteConfirm}
+      title="Delete Category"
+      description={categoryToDelete ? `Are you sure you want to delete the category "${categoryToDelete.name}"? This action cannot be undone.` : ""}
+      confirmText="Delete"
+      isLoading={deleteCategory.isPending}
+    />
+    </>
   )
 }

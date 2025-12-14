@@ -85,6 +85,7 @@ export function useCreateRolePosition() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-positions", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Role/Position created successfully")
     },
     onError: (error: Error) => {
@@ -130,6 +131,7 @@ export function useUpdateRolePosition() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-positions", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Role/Position updated successfully")
     },
     onError: (error: Error) => {
@@ -195,6 +197,7 @@ export function useDeleteRolePosition() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-positions", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Role/Position deleted successfully")
     },
     onError: (error: Error) => {

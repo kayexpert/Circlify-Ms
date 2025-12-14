@@ -83,35 +83,41 @@ export default function OverviewContent() {
     }
   }, [stats, groups.length, departments.length])
 
-  // Filter upcoming birthdays based on time filter - using optimized hook data
-  const filteredUpcomingBirthdays = useMemo(() => {
-    if (upcomingBirthdays.length === 0) return []
-    
-    const today = new Date()
-    const todayYear = today.getFullYear()
-    const todayMonth = today.getMonth()
-    const todayDate = today.getDate()
-    let endDate: Date
+  // Memoize today's date to avoid recalculating
+  const today = useMemo(() => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    return date
+  }, [])
+  
+  const todayYear = useMemo(() => today.getFullYear(), [today])
+  const todayMonth = useMemo(() => today.getMonth(), [today])
+  const todayDate = useMemo(() => today.getDate(), [today])
+  
+  // Memoize end date calculation
+  const endDate = useMemo(() => {
     switch (timeFilter) {
       case "month": {
-        endDate = new Date(todayYear, todayMonth + 1, 0, 23, 59, 59, 999)
-        break
+        return new Date(todayYear, todayMonth + 1, 0, 23, 59, 59, 999)
       }
       case "quarter": {
         const quarter = Math.floor(todayMonth / 3)
-        endDate = new Date(todayYear, (quarter + 1) * 3, 0, 23, 59, 59, 999)
-        break
+        return new Date(todayYear, (quarter + 1) * 3, 0, 23, 59, 59, 999)
       }
       case "year": {
-        endDate = new Date(todayYear, 11, 31, 23, 59, 59, 999)
-        break
+        return new Date(todayYear, 11, 31, 23, 59, 59, 999)
       }
       default: // "all"
         // Show next 365 days
-        endDate = new Date(todayYear, todayMonth, todayDate)
-        endDate.setDate(endDate.getDate() + 365)
-        break
+        const date = new Date(todayYear, todayMonth, todayDate)
+        date.setDate(date.getDate() + 365)
+        return date
     }
+  }, [timeFilter, todayYear, todayMonth, todayDate])
+  
+  // Filter upcoming birthdays based on time filter - using optimized hook data
+  const filteredUpcomingBirthdays = useMemo(() => {
+    if (upcomingBirthdays.length === 0) return []
 
     // Filter upcoming birthdays from hook data (already optimized server-side)
     return upcomingBirthdays
@@ -135,7 +141,7 @@ export default function OverviewContent() {
         daysUntil: bday.days_until,
         nextBirthdayDate: new Date(bday.date_of_birth),
       }))
-  }, [upcomingBirthdays, timeFilter])
+  }, [upcomingBirthdays, timeFilter, today, todayYear, endDate])
 
   // Get recent new members - using the useRecentMembers hook
   const { data: recentNewMembersData = [], isLoading: recentMembersLoading } = useRecentMembers(10)
@@ -164,13 +170,20 @@ export default function OverviewContent() {
   }, [growthData, isLoading, growthLoading])
 
   // Get recurring events from actual attendance records
+  // Memoized with early return for empty arrays
   const recurringEvents = useMemo(() => {
+    if (attendanceRecords.length === 0) return []
+    
     const serviceTypes = new Set<string>()
-    attendanceRecords.forEach(record => {
+    // Use for loop for better performance with large arrays
+    for (let i = 0; i < attendanceRecords.length; i++) {
+      const record = attendanceRecords[i]
       if (record.service_type) {
         serviceTypes.add(record.service_type)
       }
-    })
+    }
+    
+    if (serviceTypes.size === 0) return []
     
     // Map service types to dropdown values (normalize names)
     const eventMap: Record<string, string> = {}
@@ -204,25 +217,27 @@ export default function OverviewContent() {
     }
   }, [recurringEvents, selectedEventType])
 
+  // Memoize current year to avoid recalculating
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
+  
   // Get attendance data for selected event type from real records
   const getAttendanceData = useMemo(() => {
     if (isLoading || attendanceRecords.length === 0) {
       return []
     }
 
-    const now = new Date()
-    const currentYear = now.getFullYear()
-
     if (selectedEventType === "all") {
       // Show all events on x-axis with their attendance numbers
       const eventAttendanceMap = new Map<string, number>()
       
-      attendanceRecords.forEach(record => {
+      // Use for loop for better performance
+      for (let i = 0; i < attendanceRecords.length; i++) {
+        const record = attendanceRecords[i]
         if (record.service_type && record.total_attendance) {
           const current = eventAttendanceMap.get(record.service_type) || 0
           eventAttendanceMap.set(record.service_type, current + record.total_attendance)
         }
-      })
+      }
 
       return Array.from(eventAttendanceMap.entries())
         .map(([event, total]) => ({
@@ -238,17 +253,20 @@ export default function OverviewContent() {
       const serviceType = selectedEvent.originalType
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
       
+      // Pre-filter records for this service type to avoid repeated filtering
+      const serviceTypeRecords = attendanceRecords.filter(record => record.service_type === serviceType)
+      
       return monthNames.map((monthName, index) => {
         const monthStart = new Date(currentYear, index, 1)
         const monthEnd = new Date(currentYear, index + 1, 1)
         
-        const monthRecords = attendanceRecords.filter(record => {
-          if (record.service_type !== serviceType) return false
+        const totalAttendance = serviceTypeRecords.reduce((sum, record) => {
           const recordDate = new Date(record.date + "T00:00:00")
-          return recordDate >= monthStart && recordDate < monthEnd
-        })
-
-        const totalAttendance = monthRecords.reduce((sum, record) => sum + (record.total_attendance || 0), 0)
+          if (recordDate >= monthStart && recordDate < monthEnd) {
+            return sum + (record.total_attendance || 0)
+          }
+          return sum
+        }, 0)
 
         return {
           date: monthName,
@@ -256,7 +274,7 @@ export default function OverviewContent() {
         }
       })
     }
-  }, [attendanceRecords, selectedEventType, recurringEvents, isLoading])
+  }, [attendanceRecords, selectedEventType, recurringEvents, isLoading, currentYear])
 
   // Calculate age distribution - simplified since we're not loading all members
   // For detailed age distribution, consider using a dedicated statistics endpoint

@@ -7,9 +7,10 @@ export interface Message {
   recipientCount: number
   message: string
   date: Date
-  status: "Sent" | "Failed"
+  status: "Sent" | "Failed" | "Scheduled"
   cost?: number
   templateId?: string
+  errorMessage?: string // Error message if status is Failed
 }
 
 export interface Template {

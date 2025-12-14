@@ -38,7 +38,7 @@ export function isQueryComplete<TData, TError>(
     // In React Query v5, status can be 'pending', 'error', or 'success'
     // If status is 'pending' and fetchStatus is 'idle', query is disabled
     const status = (query as any).status
-    if (status === 'pending' && query.fetchStatus === 'idle') {
+    if (status === 'pending' && (query as any).fetchStatus === 'idle') {
       // Query is disabled, not complete
       return false
     }

@@ -22,6 +22,7 @@ import { useRolesPositions, useCreateRolePosition, useUpdateRolePosition, useDel
 import { useMembers } from "@/hooks/members/useMembers"
 import type { Group, Department, RolePosition } from "./types"
 import { cn } from "@/lib/utils"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 
 export default function GroupsDepartmentsContent() {
   // Fetch data using hooks
@@ -49,6 +50,8 @@ export default function GroupsDepartmentsContent() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [leaderSearchQuery, setLeaderSearchQuery] = useState("")
   const [leaderOpen, setLeaderOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: "group" | "department" | "role"; name: string } | null>(null)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -80,22 +83,27 @@ export default function GroupsDepartmentsContent() {
     })
   }
 
-  const handleDelete = async (id: string, type: "group" | "department" | "role") => {
-    if (!confirm(`Are you sure you want to delete this ${type}?`)) {
-      return
-    }
+  const handleDeleteClick = (id: string, type: "group" | "department" | "role", name: string) => {
+    setItemToDelete({ id, type, name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return
 
     try {
-      if (type === "group") {
-        await deleteGroup.mutateAsync(id)
-      } else if (type === "department") {
-        await deleteDepartment.mutateAsync(id)
+      if (itemToDelete.type === "group") {
+        await deleteGroup.mutateAsync(itemToDelete.id)
+      } else if (itemToDelete.type === "department") {
+        await deleteDepartment.mutateAsync(itemToDelete.id)
       } else {
-        await deleteRolePosition.mutateAsync(id)
+        await deleteRolePosition.mutateAsync(itemToDelete.id)
       }
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
     } catch (error) {
       // Error is already handled by the hook (toast)
-      console.error(`Error deleting ${type}:`, error)
+      console.error(`Error deleting ${itemToDelete.type}:`, error)
     }
   }
 
@@ -166,37 +174,76 @@ export default function GroupsDepartmentsContent() {
     }
   }
 
+  // Memoize search query to avoid recalculating
+  const searchQueryLower = useMemo(() => searchQuery.toLowerCase(), [searchQuery])
+  
   const filteredGroups = useMemo(() => {
-    return groups.filter((group) =>
-      group.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [groups, searchQuery])
+    if (!searchQueryLower) return groups
+    
+    // Use for loop for better performance
+    const results: typeof groups = []
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i]
+      if (group.name?.toLowerCase().includes(searchQueryLower) ||
+          group.description?.toLowerCase().includes(searchQueryLower)) {
+        results.push(group)
+      }
+    }
+    return results
+  }, [groups, searchQueryLower])
 
   const filteredDepartments = useMemo(() => {
-    return departments.filter((department) =>
-      department.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      department.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [departments, searchQuery])
+    if (!searchQueryLower) return departments
+    
+    // Use for loop for better performance
+    const results: typeof departments = []
+    for (let i = 0; i < departments.length; i++) {
+      const department = departments[i]
+      if (department.name?.toLowerCase().includes(searchQueryLower) ||
+          department.description?.toLowerCase().includes(searchQueryLower)) {
+        results.push(department)
+      }
+    }
+    return results
+  }, [departments, searchQueryLower])
 
   const filteredRolesPositions = useMemo(() => {
-    return rolesPositions.filter((role) =>
-      role.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      role.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [rolesPositions, searchQuery])
+    if (!searchQueryLower) return rolesPositions
+    
+    // Use for loop for better performance
+    const results: typeof rolesPositions = []
+    for (let i = 0; i < rolesPositions.length; i++) {
+      const role = rolesPositions[i]
+      if (role.name?.toLowerCase().includes(searchQueryLower) ||
+          role.description?.toLowerCase().includes(searchQueryLower)) {
+        results.push(role)
+      }
+    }
+    return results
+  }, [rolesPositions, searchQueryLower])
 
-  // Filter members for leader search
+  // Filter members for leader search - optimized
+  const leaderSearchQueryLower = useMemo(() => leaderSearchQuery.trim().toLowerCase(), [leaderSearchQuery])
+  
   const filteredMembers = useMemo(() => {
-    if (!leaderSearchQuery.trim()) return members
-    const query = leaderSearchQuery.toLowerCase()
-    return members.filter((member: any) =>
-      member.first_name?.toLowerCase().includes(query) ||
-      member.last_name?.toLowerCase().includes(query) ||
-      `${member.first_name || ''} ${member.last_name || ''}`.toLowerCase().includes(query)
-    )
-  }, [members, leaderSearchQuery])
+    if (!leaderSearchQueryLower) return members
+    
+    // Use for loop for better performance
+    const results: typeof members = []
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i] as any
+      const firstNameLower = member.first_name?.toLowerCase() || ""
+      const lastNameLower = member.last_name?.toLowerCase() || ""
+      const fullNameLower = `${firstNameLower} ${lastNameLower}`
+      
+      if (firstNameLower.includes(leaderSearchQueryLower) ||
+          lastNameLower.includes(leaderSearchQueryLower) ||
+          fullNameLower.includes(leaderSearchQueryLower)) {
+        results.push(member)
+      }
+    }
+    return results
+  }, [members, leaderSearchQueryLower])
 
   return (
     <div className="space-y-6">
@@ -447,7 +494,7 @@ export default function GroupsDepartmentsContent() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleDelete(group.id, "group")}
+                                onClick={() => handleDeleteClick(group.id, "group", group.name)}
                                 disabled={createGroup.isPending || updateGroup.isPending || deleteGroup.isPending}
                               >
                                 {deleteGroup.isPending ? (
@@ -695,7 +742,7 @@ export default function GroupsDepartmentsContent() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleDelete(department.id, "department")}
+                                onClick={() => handleDeleteClick(department.id, "department", department.name)}
                                 disabled={createDepartment.isPending || updateDepartment.isPending || deleteDepartment.isPending}
                               >
                                 {deleteDepartment.isPending ? (
@@ -860,7 +907,7 @@ export default function GroupsDepartmentsContent() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleDelete(role.id, "role")}
+                                onClick={() => handleDeleteClick(role.id, "role", role.name)}
                                 disabled={createRolePosition.isPending || updateRolePosition.isPending || deleteRolePosition.isPending}
                               >
                                 {deleteRolePosition.isPending ? (
@@ -881,6 +928,17 @@ export default function GroupsDepartmentsContent() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title={`Delete ${itemToDelete?.type ? itemToDelete.type.charAt(0).toUpperCase() + itemToDelete.type.slice(1) : ""}`}
+        description={itemToDelete ? `Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.` : ""}
+        confirmText="Delete"
+        isLoading={deleteGroup.isPending || deleteDepartment.isPending || deleteRolePosition.isPending}
+      />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { ProfileSettingsTab } from "./profile-settings-tab"
 import { UsersSettingsTab } from "./users-settings-tab"
 import { NotificationsSettingsTab } from "./notifications-settings-tab"
 import { UserFormSheet } from "./user-form-sheet"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 
 export function SettingsPageClient() {
   const { organization, isLoading: orgLoading, refreshOrganization } = useOrganization()
@@ -25,6 +26,8 @@ export function SettingsPageClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const [userFormData, setUserFormData] = useState({
     name: "",
@@ -128,19 +131,26 @@ export function SettingsPageClient() {
     setIsUserSheetOpen(true)
   }
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to remove this user?")) return
+  const handleDeleteUserClick = (userId: string) => {
+    setUserToDelete(userId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return
 
     try {
       const { error } = await supabase
         .from("organization_users")
         .delete()
-        .eq("user_id", userId)
+        .eq("user_id", userToDelete)
 
       if (error) throw error
 
       toast.success("User has been removed from the organization.")
       refreshUsers()
+      setDeleteDialogOpen(false)
+      setUserToDelete(null)
     } catch (error: any) {
       toast.error(error.message || "Failed to remove user")
     }
@@ -471,7 +481,7 @@ export function SettingsPageClient() {
             users={users}
             onAddUser={handleAddUser}
             onEditUser={handleEditUser}
-            onDeleteUser={handleDeleteUser}
+            onDeleteUser={handleDeleteUserClick}
           />
         </TabsContent>
 
@@ -494,6 +504,16 @@ export function SettingsPageClient() {
         onFormDataChange={setUserFormData}
         onSubmit={handleSubmitUser}
         isSaving={isSaving}
+      />
+
+      {/* Delete User Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteUserConfirm}
+        title="Remove User"
+        description="Are you sure you want to remove this user? This action cannot be undone."
+        confirmText="Remove"
       />
     </div>
   )

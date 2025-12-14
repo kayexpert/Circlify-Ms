@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "../use-organization"
 import { toast } from "sonner"
-import { personalizeMessage, formatPhoneNumber, calculateSMSCost } from "@/app/(dashboard)/dashboard/messaging/utils"
+import { sendContributionNotification, shouldSendContributionNotification } from "@/lib/services/notification.service"
 import type { ProjectIncome, ProjectIncomeInsert, ProjectIncomeUpdate } from "@/types/database-extension"
 
 export function useProjectIncome(projectId: string | null) {
@@ -77,8 +77,8 @@ export function useCreateProjectIncome() {
         throw new Error(`Invalid member_id format. Expected UUID, got: ${incomeData.member_id} (type: ${typeof incomeData.member_id})`)
       }
 
-      const { data, error } = await supabase
-        .from("project_income")
+      const { data, error } = await (supabase
+        .from("project_income") as any)
         .insert({
           ...incomeData,
           project_id: projectId,
@@ -119,241 +119,68 @@ export function useCreateProjectIncome() {
       toast.success("Income record added successfully")
 
       // Send contribution notification if enabled and record has a member
-      if (variables.member_id && organization?.id) {
+      // Use notification service for better maintainability
+      if (variables.member_id && organization?.id && variables.amount) {
         try {
-          // Check if contribution notifications are enabled
-          const { data: notificationSettings } = await supabase
-            .from("messaging_notification_settings")
-            .select("contribution_notifications_enabled, contribution_template_id")
-            .eq("organization_id", organization.id)
-            .maybeSingle()
-
-          if ((notificationSettings as any)?.contribution_notifications_enabled) {
-            // Get active API configuration
-            const { data: activeApiConfig } = await supabase
-              .from("messaging_api_configurations")
-              .select("*")
-              .eq("organization_id", organization.id)
-              .eq("is_active", true)
-              .maybeSingle()
-
-            if (!activeApiConfig) {
-              if (process.env.NODE_ENV === "development") {
-                console.log("No active API configuration found for project contribution notification")
-              }
-              return
-            }
-
-            // Get member data including phone number
-            const { data: member } = await supabase
-              .from("members")
-              .select("id, first_name, last_name, phone_number")
-              .eq("id", variables.member_id)
-              .eq("organization_id", organization.id)
-              .maybeSingle()
-
-            if (!member || !(member as any).phone_number) {
-              if (process.env.NODE_ENV === "development") {
-                console.log("Member not found or no phone number for project contribution notification")
-              }
-              return
-            }
-
-            // Get project name for the message
+          // Check if contribution notifications are enabled (optimized early exit)
+          // Use "Project" category to match shouldSendContributionNotification logic
+          const shouldSend = await shouldSendContributionNotification(organization.id, "Project")
+          
+          if (shouldSend) {
+            // Get project name for the notification
             const { data: projectData } = await supabase
               .from("projects")
               .select("name")
               .eq("id", data.project_id)
               .maybeSingle()
-
+            
             const projectName = (projectData as any)?.name || "the project"
 
-            // Get template if configured
-            let messageText = `Thank you for your contribution of ${variables.amount?.toLocaleString() || 0} ${organization.currency || "USD"} to ${projectName} on ${new Date(variables.date).toLocaleDateString()}. We appreciate your support!`
-            
-            if ((notificationSettings as any).contribution_template_id) {
-              const { data: template } = await supabase
-                .from("messaging_templates")
-                .select("message")
-                .eq("id", (notificationSettings as any).contribution_template_id)
-                .eq("organization_id", organization.id)
-                .maybeSingle()
-
-              if ((template as any)?.message) {
-                messageText = personalizeMessage((template as any).message, {
-                  FirstName: (member as any).first_name || "",
-                  LastName: (member as any).last_name || "",
-                  PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
-                  Amount: (variables.amount || 0).toLocaleString(),
-                  Currency: organization.currency || "USD",
-                  Date: new Date(variables.date).toLocaleDateString(),
-                  Category: projectName, // Use project name instead of category for project contributions
-                  ProjectName: projectName,
+            // Send notification asynchronously - don't block the UI
+            sendContributionNotification({
+              organizationId: organization.id,
+              memberId: variables.member_id as string,
+              amount: variables.amount,
+              date: variables.date,
+              category: "Project Contribution",
+              currency: organization.currency,
+              projectName: projectName, // Include project name for project contributions
+            })
+              .then((result) => {
+                if (result.success) {
+                  // Invalidate messaging queries on success
+                  queryClient.invalidateQueries({ queryKey: ["messaging_messages", organization.id] })
+                  queryClient.invalidateQueries({ queryKey: ["messaging_analytics", organization.id] })
+                  queryClient.invalidateQueries({ queryKey: ["messaging_balance", organization.id] })
+                } else {
+                  // Log error but don't show toast - notification is optional
+                  console.warn("Failed to send project contribution notification:", {
+                    error: result.error,
+                    organizationId: organization.id,
+                    memberId: variables.member_id,
+                    amount: variables.amount,
+                    projectName: projectName,
+                  })
+                }
+              })
+              .catch((error) => {
+                // Log error but don't fail the income record creation
+                console.error("Error sending project contribution notification:", {
+                  error: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                  organizationId: organization.id,
+                  memberId: variables.member_id,
+                  amount: variables.amount,
                 })
-              }
-            } else {
-              // Personalize default message
-              messageText = personalizeMessage(messageText, {
-                FirstName: (member as any).first_name || "",
-                LastName: (member as any).last_name || "",
-                PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
-                Amount: (variables.amount || 0).toLocaleString(),
-                Currency: organization.currency || "GHS",
-                Date: new Date(variables.date).toLocaleDateString(),
-                Category: projectName, // Use project name instead of category for project contributions
-                ProjectName: projectName,
               })
-            }
-
-            // Get current user for created_by
-            const {
-              data: { user },
-            } = await supabase.auth.getUser()
-            if (!user) {
-              if (process.env.NODE_ENV === "development") {
-                console.log("User not authenticated for project contribution notification")
-              }
-              return
-            }
-
-            // Calculate cost
-            const cost = calculateSMSCost(messageText.length, 1)
-
-            // Create message record
-            const { data: message, error: messageError } = await supabase
-              .from("messaging_messages")
-              .insert({
-                organization_id: organization.id,
-                message_name: `Project Contribution Notification - ${(member as any).first_name} ${(member as any).last_name}`,
-                message_text: messageText,
-                recipient_type: "individual",
-                recipient_count: 1,
-                status: "Sending",
-                template_id: (notificationSettings as any).contribution_template_id || null,
-                api_configuration_id: (activeApiConfig as any).id,
-                cost: cost,
-                created_by: user.id,
-              } as never)
-              .select()
-              .single()
-
-            if (messageError) {
-              console.error("Error creating project contribution notification message:", messageError)
-              return
-            }
-
-            // Create recipient record
-            const formattedPhone = formatPhoneNumber((member as any).phone_number)
-            const { data: recipient, error: recipientError } = await supabase
-              .from("messaging_message_recipients")
-              .insert({
-                message_id: (message as any).id,
-                recipient_type: "member",
-                recipient_id: (member as any).id,
-                phone_number: formattedPhone || (member as any).phone_number,
-                recipient_name: `${(member as any).first_name} ${(member as any).last_name}`,
-                personalized_message: messageText,
-                status: "Pending",
-                cost: cost,
-              } as never)
-              .select()
-              .single()
-
-            if (recipientError) {
-              console.error("Error creating recipient record:", recipientError)
-              // Update message status to Failed
-              await supabase
-                .from("messaging_messages")
-                .update({ status: "Failed", error_message: "Failed to create recipient record" } as never)
-                .eq("id", (message as any).id)
-              return
-            }
-
-            // Actually send the SMS via API
-            try {
-              const { formatPhoneForWigal } = await import("@/lib/services/wigal-sms.service")
-              
-              const sendResponse = await fetch("/api/messaging/send-sms", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  apiKey: (activeApiConfig as any).api_key,
-                  username: (activeApiConfig as any).username || (activeApiConfig as any).api_key,
-                  senderId: (activeApiConfig as any).sender_id,
-                  destinations: [{
-                    phone: formattedPhone || (member as any).phone_number,
-                    message: messageText,
-                    msgid: `MSG_${(message as any).id}_${(member as any).id}_${Date.now()}`,
-                  }],
-                }),
-              })
-
-              const sendResult = await sendResponse.json()
-
-              if (sendResult.success || sendResponse.ok) {
-                // Update message and recipient status to Sent
-                await supabase
-                  .from("messaging_messages")
-                  .update({
-                    status: "Sent",
-                    sent_at: new Date().toISOString(),
-                  } as never)
-                  .eq("id", (message as any).id)
-
-                await supabase
-                  .from("messaging_message_recipients")
-                  .update({
-                    status: "Sent",
-                    sent_at: new Date().toISOString(),
-                  } as never)
-                  .eq("id", (recipient as any).id)
-              } else {
-                // Update message and recipient status to Failed
-                const errorMsg = sendResult.error?.message || sendResult.message || "Failed to send SMS"
-                await supabase
-                  .from("messaging_messages")
-                  .update({
-                    status: "Failed",
-                    error_message: errorMsg,
-                  } as never)
-                  .eq("id", (message as any).id)
-
-                await supabase
-                  .from("messaging_message_recipients")
-                  .update({
-                    status: "Failed",
-                    error_message: errorMsg,
-                  } as never)
-                  .eq("id", (recipient as any).id)
-              }
-            } catch (sendError) {
-              console.error("Error sending SMS via API:", sendError)
-              // Update message and recipient status to Failed
-              const errorMsg = sendError instanceof Error ? sendError.message : "Failed to send SMS"
-              await supabase
-                .from("messaging_messages")
-                .update({
-                  status: "Failed",
-                  error_message: errorMsg,
-                } as never)
-                .eq("id", (message as any).id)
-
-              if (recipient) {
-                await supabase
-                  .from("messaging_message_recipients")
-                  .update({
-                    status: "Failed",
-                    error_message: errorMsg,
-                  } as never)
-                  .eq("id", (recipient as any).id)
-              }
-            }
           }
         } catch (error) {
-          console.error("Error sending project contribution notification:", error)
-          // Don't throw - SMS failure shouldn't block the income record creation
+          // Don't fail the income record creation if notification check fails
+          console.error("Error checking project contribution notification:", {
+            error: error instanceof Error ? error.message : String(error),
+            organizationId: organization.id,
+            memberId: variables.member_id,
+          })
         }
       }
     },
@@ -397,8 +224,8 @@ export function useUpdateProjectIncome() {
         throw new Error("Amount must be greater than 0")
       }
 
-      const { data, error } = await supabase
-        .from("project_income")
+      const { data, error } = await (supabase
+        .from("project_income") as any)
         .update({
           ...updateData,
           updated_at: new Date().toISOString(),
@@ -509,7 +336,7 @@ export function useDeleteProjectIncome() {
         console.warn("Delete operation completed but no rows were deleted for ID:", id)
       }
 
-      return incomeData.project_id
+      return (incomeData as any).project_id
     },
     onSuccess: (projectId) => {
       if (projectId) {

@@ -148,6 +148,21 @@ export function useCreateExpenditureRecord() {
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+      ])
+      // Force immediate refetch of all queries (not just active) to ensure account statements and all related data update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Expenditure record created successfully")
     },
@@ -222,6 +237,21 @@ export function useUpdateExpenditureRecord() {
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+      ])
+      // Force immediate refetch of all queries (not just active) to ensure account statements and all related data update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Expenditure record updated successfully")
     },
@@ -315,6 +345,21 @@ export function useDeleteExpenditureRecord() {
         queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
+      ])
+      // Force immediate refetch of all queries (not just active) to ensure account statements and liabilities update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Expenditure record deleted successfully")
     },

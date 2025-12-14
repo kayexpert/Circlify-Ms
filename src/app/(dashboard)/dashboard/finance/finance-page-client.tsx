@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, lazy, Suspense } from "react"
+import React, { useState, lazy, Suspense, useEffect, useCallback } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
@@ -101,11 +102,44 @@ const dummyMembers = [
   { id: 5, first_name: "Mary", last_name: "Smith", email: "mary.smith@example.com", phone_number: "+233 24 678 9012", membership_status: "active" },
 ]
 
+const VALID_TABS = ["overview", "income", "expenditure", "liabilities", "accounts", "reconciliation", "categories"] as const
+
 export function FinancePageClient() {
-  const [activeTab, setActiveTab] = useState("overview")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState<string>(tabParam && VALID_TABS.includes(tabParam as any) ? tabParam : "overview")
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [sheetType, setSheetType] = useState<"income" | "expenditure" | "account" | "liability">("income")
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
+
+  // Update tab when URL parameter changes
+  useEffect(() => {
+    if (tabParam && VALID_TABS.includes(tabParam as any)) {
+      setActiveTab(tabParam)
+    } else if (!tabParam) {
+      // If no tab param, default to overview
+      setActiveTab("overview")
+    }
+  }, [tabParam])
+
+  // Handle tab change - update both state and URL
+  const handleTabChange = useCallback((value: string) => {
+    if (VALID_TABS.includes(value as any)) {
+      setActiveTab(value)
+      // Update URL without causing a full page reload
+      const params = new URLSearchParams(searchParams.toString())
+      if (value === "overview") {
+        // Remove tab param for overview (default tab)
+        params.delete("tab")
+      } else {
+        params.set("tab", value)
+      }
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      router.replace(newUrl, { scroll: false })
+    }
+  }, [router, pathname, searchParams])
 
   // Note: Income records are now managed by IncomeContent component using database hooks
   // This file uses dummy data for legacy compatibility
@@ -345,7 +379,7 @@ export function FinancePageClient() {
     <div className="space-y-6">
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="income">Income</TabsTrigger>

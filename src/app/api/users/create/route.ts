@@ -1,48 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { verifySuperAdmin } from "@/lib/middleware/api-auth";
+import { handleApiError, logError } from "@/lib/utils/error-handler";
+import { withPerformanceMonitoring } from "@/lib/middleware/performance-monitor";
 
 const createUserSchema = z.object({
-  email: z.string().email(),
-  full_name: z.string().min(2),
-  password: z.string().min(8),
-  role: z.enum(["admin", "member", "viewer"]),
+  email: z.string().email("Invalid email address"),
+  full_name: z.string().min(2, "Full name must be at least 2 characters").max(200),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(["admin", "member", "viewer"]).refine(
+    (val) => ["admin", "member", "viewer"].includes(val),
+    { message: "Role must be admin, member, or viewer" }
+  ),
 });
 
-export async function POST(request: NextRequest) {
+async function handleCreateUser(request: NextRequest) {
+  // Use Sentry tracing for this operation
   try {
-    const supabase = await createClient();
+    const Sentry = await import("@sentry/nextjs")
+    
+    return await Sentry.startSpan(
+      {
+        op: "http.server",
+        name: "POST /api/users/create",
+      },
+      async (span) => {
+        span.setAttribute("http.method", "POST")
+        span.setAttribute("http.route", "/api/users/create")
+        
+        try {
+          return await executeCreateUser(request, span)
+        } catch (error) {
+          span.setStatus({ code: 2, message: error instanceof Error ? error.message : "Unknown error" })
+          span.setAttribute("error", true)
+          throw error
+        }
+      }
+    )
+  } catch {
+    // Sentry not available, execute without tracing
+    return await executeCreateUser(request, null)
+  }
+}
 
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+async function executeCreateUser(request: NextRequest, span: any) {
+  try {
+    // Verify super admin access
+    const authResult = await verifySuperAdmin(request);
+    if (authResult.error || !authResult.auth) {
+      return authResult.error!;
     }
 
-    // Optimized: Get session and role in parallel
-    const { getUserSessionAndRole } = await import("@/lib/supabase/optimized-queries");
-    const { session, role, organizationId } = await getUserSessionAndRole(user.id);
+    const { organizationId } = authResult.auth;
 
-    if (!session || !organizationId) {
+    // Parse and validate request body
+    const body = await request.json();
+    const validatedData = createUserSchema.safeParse(body);
+
+    if (!validatedData.success) {
       return NextResponse.json(
-        { error: "No active organization" },
+        { error: "Invalid request data", details: validatedData.error.issues },
         { status: 400 }
       );
     }
-
-    if (role !== "super_admin") {
-      return NextResponse.json(
-        { error: "Only super admins can create users" },
-        { status: 403 }
-      );
-    }
-
-    // Parse request body
-    const body = await request.json();
-    const validatedData = createUserSchema.parse(body);
 
     // Create user in Supabase Auth (using service role key)
     // Note: This requires SUPABASE_SERVICE_ROLE_KEY in environment
@@ -67,13 +88,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Create auth user
+    if (span) {
+      span.setAttribute("step", "create_auth_user")
+    }
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
-        email: validatedData.email,
-        password: validatedData.password,
+        email: validatedData.data.email,
+        password: validatedData.data.password,
         email_confirm: true,
         user_metadata: {
-          full_name: validatedData.full_name,
+          full_name: validatedData.data.full_name,
         },
       });
 
@@ -93,13 +117,16 @@ export async function POST(request: NextRequest) {
 
     // Create user record (use upsert in case trigger already created it)
     // The trigger on_auth_user_created might have already created the user record
+    if (span) {
+      span.setAttribute("step", "create_user_record")
+    }
     const { error: userError } = await supabaseAdmin
       .from("users")
       .upsert(
         {
           id: authData.user.id,
-          email: validatedData.email,
-          full_name: validatedData.full_name,
+          email: validatedData.data.email,
+          full_name: validatedData.data.full_name,
         },
         {
           onConflict: "id",
@@ -107,7 +134,11 @@ export async function POST(request: NextRequest) {
       );
 
     if (userError) {
-      console.error("Error creating/updating user record:", userError);
+      logError(userError, {
+        action: "create_user_record",
+        userId: authData.user.id,
+        organizationId,
+      }, "high");
       // Cleanup: delete auth user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json(
@@ -117,16 +148,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Add to organization (use admin client to bypass RLS)
+    if (span) {
+      span.setAttribute("step", "add_to_organization")
+    }
     const { error: orgUserError } = await supabaseAdmin
       .from("organization_users")
       .insert({
         organization_id: organizationId,
         user_id: authData.user.id,
-        role: validatedData.role,
+        role: validatedData.data.role,
       });
 
     if (orgUserError) {
-      console.error("Error adding user to organization:", orgUserError);
+      logError(orgUserError, {
+        action: "add_user_to_organization",
+        userId: authData.user.id,
+        organizationId,
+      }, "high");
       // Cleanup
       await supabaseAdmin.from("users").delete().eq("id", authData.user.id);
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
@@ -137,6 +175,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user session (use admin client to bypass RLS)
+    if (span) {
+      span.setAttribute("step", "create_user_session")
+    }
     const { error: sessionError } = await supabaseAdmin
       .from("user_sessions")
       .insert({
@@ -145,7 +186,11 @@ export async function POST(request: NextRequest) {
       });
 
     if (sessionError) {
-      console.error("Error creating user session:", sessionError);
+      logError(sessionError, {
+        action: "create_user_session",
+        userId: authData.user.id,
+        organizationId,
+      }, "high");
       // Cleanup
       await supabaseAdmin
         .from("organization_users")
@@ -163,25 +208,33 @@ export async function POST(request: NextRequest) {
       success: true,
       user: {
         id: authData.user.id,
-        email: validatedData.email,
-        full_name: validatedData.full_name,
-        role: validatedData.role,
+        email: validatedData.data.email,
+        full_name: validatedData.data.full_name,
+        role: validatedData.data.role,
       },
     });
   } catch (error) {
-    console.error("Error creating user:", error);
+    logError(error, {
+      action: "create_user",
+    }, "high");
+    
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request data", details: error.issues },
         { status: 400 }
       );
     }
-    const errorMessage =
-      error instanceof Error ? error.message : "Internal server error";
+    
+    const errorMessage = handleApiError(error, "Failed to create user");
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
     );
   }
 }
+
+// Export with performance monitoring
+export const POST = withPerformanceMonitoring(handleCreateUser, {
+  slowThreshold: 2000, // Log warning if user creation takes > 2s
+});
 

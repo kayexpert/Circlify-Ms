@@ -91,7 +91,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         
         if (!mounted) return;
         
-        if (sessionError || !session || !session.organization_id) {
+        if (sessionError || !session || !(session as any)?.organization_id) {
           // User has organization_users link but no active session
           // This means they haven't completed onboarding or session wasn't created
           router.replace("/setup-organization");

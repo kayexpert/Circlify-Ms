@@ -102,9 +102,15 @@ export function SignUpPageClient() {
         return;
       }
 
-      toast.success("Account created successfully! Let's set up your organization.");
-      router.push("/setup-organization");
-      router.refresh();
+      // Show success message asking user to check their email
+      toast.success(
+        "Account created successfully! Please check your email to confirm your account before setting up your organization.",
+        { duration: 6000 }
+      );
+      
+      // Reset form and stay on signup page
+      form.reset();
+      setIsLoading(false);
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("Sign up error:", error);

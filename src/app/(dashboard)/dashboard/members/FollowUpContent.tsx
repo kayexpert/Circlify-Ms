@@ -19,6 +19,7 @@ import { useMembers } from "@/hooks/members/useMembers"
 import { useVisitors } from "@/hooks/members/useVisitors"
 import { 
   useMemberFollowUps, 
+  useAllMemberFollowUps,
   useCreateMemberFollowUp, 
   useDeleteMemberFollowUp 
 } from "@/hooks/members/useMemberFollowUps"
@@ -47,6 +48,8 @@ export default function FollowUpContent() {
     memberId: "",
     visitorId: "",
   })
+  
+  const [showAllMembers, setShowAllMembers] = useState(true)
 
   const { organization } = useOrganization()
   const supabase = createClient()
@@ -96,28 +99,44 @@ export default function FollowUpContent() {
   }
 
   // Fetch UUIDs when member/visitor selection changes
+  // Only fetch if UUID is not already set to avoid unnecessary calls
   useEffect(() => {
-    if (activeSubTab === "members" && selectedMember) {
-      getMemberUUID(selectedMember.id).then(setMemberUUID)
+    if (activeSubTab === "members" && selectedMember && !showAllMembers) {
+      // Only fetch if we don't already have the UUID
+      if (!memberUUID || memberUUID !== selectedMember.id.toString()) {
+        getMemberUUID(selectedMember.id).then(uuid => {
+          if (uuid) setMemberUUID(uuid)
+        })
+      }
     } else {
       setMemberUUID(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubTab, formData.memberId, organization?.id])
+  }, [activeSubTab, formData.memberId, showAllMembers, organization?.id])
 
   useEffect(() => {
     if (activeSubTab === "visitors" && selectedVisitor) {
-      getVisitorUUID(selectedVisitor.id).then(setVisitorUUID)
+      // Only fetch if we don't already have the UUID
+      if (!visitorUUID || visitorUUID !== selectedVisitor.id.toString()) {
+        getVisitorUUID(selectedVisitor.id).then(uuid => {
+          if (uuid) setVisitorUUID(uuid)
+        })
+      }
     } else {
       setVisitorUUID(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSubTab, formData.visitorId, organization?.id])
 
-  // Fetch follow-ups
+  // Fetch follow-ups - use all follow-ups hook when "all" is selected
+  const { data: allMemberFollowUps = [], isLoading: allMemberFollowUpsLoading } = useAllMemberFollowUps()
   const { data: memberFollowUps = [], isLoading: memberFollowUpsLoading } = useMemberFollowUps(
-    activeSubTab === "members" ? memberUUID : null
+    activeSubTab === "members" && !showAllMembers ? memberUUID : null
   )
+  
+  // Determine which follow-ups to display
+  const displayFollowUps = showAllMembers ? allMemberFollowUps : memberFollowUps
+  const isLoadingFollowUps = showAllMembers ? allMemberFollowUpsLoading : memberFollowUpsLoading
   const { data: visitorFollowUps = [], isLoading: visitorFollowUpsLoading } = useVisitorFollowUps(
     activeSubTab === "visitors" ? visitorUUID : null
   )
@@ -128,28 +147,50 @@ export default function FollowUpContent() {
   const createVisitorFollowUp = useCreateVisitorFollowUp()
   const deleteVisitorFollowUp = useDeleteVisitorFollowUp()
 
-  // Filter members and visitors
+  // Memoize search queries to avoid recalculating
+  const memberSearchQueryLower = useMemo(() => memberSearchQuery.toLowerCase(), [memberSearchQuery])
+  const visitorSearchQueryLower = useMemo(() => visitorSearchQuery.toLowerCase(), [visitorSearchQuery])
+  
+  // Filter members and visitors - optimized with early returns
   const filteredMembers = useMemo(() => {
-    if (!memberSearchQuery) return members
-    const query = memberSearchQuery.toLowerCase()
-    return members.filter(
-      (member: any) =>
-        member.first_name.toLowerCase().includes(query) ||
-        member.last_name.toLowerCase().includes(query) ||
-        `${member.first_name} ${member.last_name}`.toLowerCase().includes(query)
-    )
-  }, [members, memberSearchQuery])
+    if (!memberSearchQueryLower) return members
+    
+    // Use for loop for better performance
+    const results: typeof members = []
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i] as any
+      const firstNameLower = member.first_name?.toLowerCase() || ""
+      const lastNameLower = member.last_name?.toLowerCase() || ""
+      const fullNameLower = `${firstNameLower} ${lastNameLower}`
+      
+      if (firstNameLower.includes(memberSearchQueryLower) ||
+          lastNameLower.includes(memberSearchQueryLower) ||
+          fullNameLower.includes(memberSearchQueryLower)) {
+        results.push(member)
+      }
+    }
+    return results
+  }, [members, memberSearchQueryLower])
 
   const filteredVisitors = useMemo(() => {
-    if (!visitorSearchQuery) return visitors
-    const query = visitorSearchQuery.toLowerCase()
-    return visitors.filter(
-      (visitor: any) =>
-        visitor.first_name.toLowerCase().includes(query) ||
-        visitor.last_name.toLowerCase().includes(query) ||
-        `${visitor.first_name} ${visitor.last_name}`.toLowerCase().includes(query)
-    )
-  }, [visitors, visitorSearchQuery])
+    if (!visitorSearchQueryLower) return visitors
+    
+    // Use for loop for better performance
+    const results: typeof visitors = []
+    for (let i = 0; i < visitors.length; i++) {
+      const visitor = visitors[i] as any
+      const firstNameLower = visitor.first_name?.toLowerCase() || ""
+      const lastNameLower = visitor.last_name?.toLowerCase() || ""
+      const fullNameLower = `${firstNameLower} ${lastNameLower}`
+      
+      if (firstNameLower.includes(visitorSearchQueryLower) ||
+          lastNameLower.includes(visitorSearchQueryLower) ||
+          fullNameLower.includes(visitorSearchQueryLower)) {
+        results.push(visitor)
+      }
+    }
+    return results
+  }, [visitors, visitorSearchQueryLower])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -238,10 +279,10 @@ export default function FollowUpContent() {
   }
 
   // Get current follow-ups based on active tab
-  const currentFollowUps = activeSubTab === "members" ? memberFollowUps : visitorFollowUps
-  const isLoadingFollowUps = activeSubTab === "members" ? memberFollowUpsLoading : visitorFollowUpsLoading
+  const currentFollowUps = activeSubTab === "members" ? displayFollowUps : visitorFollowUps
+  const isLoadingCurrentFollowUps = activeSubTab === "members" ? isLoadingFollowUps : visitorFollowUpsLoading
   const selectedPersonName = activeSubTab === "members" 
-    ? (selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : "")
+    ? (showAllMembers ? "All Members" : (selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : ""))
     : (selectedVisitor ? `${selectedVisitor.first_name} ${selectedVisitor.last_name}` : "")
 
   return (
@@ -255,6 +296,7 @@ export default function FollowUpContent() {
           memberId: "",
           visitorId: "",
         })
+        setShowAllMembers(false)
         setMemberSearchQuery("")
         setVisitorSearchQuery("")
         setMemberPopoverOpen(false)
@@ -275,7 +317,7 @@ export default function FollowUpContent() {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="member">Member *</Label>
+                    <Label htmlFor="member">Member</Label>
                     <Popover open={memberPopoverOpen} onOpenChange={setMemberPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button
@@ -284,7 +326,7 @@ export default function FollowUpContent() {
                           aria-expanded={memberPopoverOpen}
                           className="w-full justify-between"
                         >
-                          {selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : "Select member..."}
+                          {showAllMembers ? "All Members" : (selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : "Select member...")}
                           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
@@ -299,6 +341,26 @@ export default function FollowUpContent() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           <div className="p-1">
+                            <div
+                              className={cn(
+                                "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                showAllMembers && "bg-accent"
+                              )}
+                              onClick={() => {
+                                setShowAllMembers(true)
+                                setFormData({ ...formData, memberId: "" })
+                                setMemberPopoverOpen(false)
+                                setMemberSearchQuery("")
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  showAllMembers ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <span>All Members</span>
+                            </div>
                             {filteredMembers.length === 0 ? (
                               <div className="py-6 text-center text-sm text-muted-foreground">
                                 No members found.
@@ -309,9 +371,10 @@ export default function FollowUpContent() {
                                   key={member.id}
                                   className={cn(
                                     "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                                    formData.memberId === member.id.toString() && "bg-accent"
+                                    formData.memberId === member.id.toString() && !showAllMembers && "bg-accent"
                                   )}
                                   onClick={() => {
+                                    setShowAllMembers(false)
                                     setFormData({ ...formData, memberId: member.id.toString() })
                                     setMemberPopoverOpen(false)
                                     setMemberSearchQuery("")
@@ -320,7 +383,7 @@ export default function FollowUpContent() {
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      formData.memberId === member.id.toString() ? "opacity-100" : "opacity-0"
+                                      formData.memberId === member.id.toString() && !showAllMembers ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   <span>{member.first_name} {member.last_name}</span>
@@ -377,7 +440,7 @@ export default function FollowUpContent() {
                   <Button 
                     type="submit" 
                     className="w-full"
-                    disabled={!formData.memberId || !formData.date || !formData.method || !formData.notes || createMemberFollowUp.isPending}
+                    disabled={(!formData.memberId && !showAllMembers) || !formData.date || !formData.method || !formData.notes || createMemberFollowUp.isPending}
                   >
                     {createMemberFollowUp.isPending ? (
                       <>
@@ -402,6 +465,7 @@ export default function FollowUpContent() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {showAllMembers && <TableHead>Member</TableHead>}
                         <TableHead>Date</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Notes</TableHead>
@@ -409,50 +473,62 @@ export default function FollowUpContent() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {isLoadingFollowUps ? (
+                      {isLoadingCurrentFollowUps ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={showAllMembers ? 5 : 4} className="text-center py-8 text-muted-foreground">
                             <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                           </TableCell>
                         </TableRow>
-                      ) : !formData.memberId ? (
+                      ) : (!formData.memberId && !showAllMembers) ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                            Select a member to view follow-ups
+                          <TableCell colSpan={showAllMembers ? 5 : 4} className="text-center py-8 text-muted-foreground">
+                            Select a member or choose "All Members" to view follow-ups
                           </TableCell>
                         </TableRow>
                       ) : currentFollowUps.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={showAllMembers ? 5 : 4} className="text-center py-8 text-muted-foreground">
                             No follow-ups recorded yet
                           </TableCell>
                         </TableRow>
                       ) : (
-                        currentFollowUps.map((followUp: any) => (
-                          <TableRow key={followUp.id}>
-                            <TableCell className="font-medium whitespace-nowrap">{formatDate(followUp.date)}</TableCell>
-                            <TableCell className="whitespace-nowrap">{followUp.method}</TableCell>
-                            <TableCell className="!whitespace-normal !break-words pr-4" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' } as React.CSSProperties}>
-                              {followUp.notes}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  if (memberUUID) {
-                                    handleDeleteMemberFollowUp(followUp.id, memberUUID)
-                                  }
-                                }}
-                                disabled={deleteMemberFollowUp.isPending}
-                                title="Delete follow-up"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        currentFollowUps.map((followUp: any) => {
+                          const memberName = showAllMembers && followUp.members 
+                            ? `${followUp.members.first_name} ${followUp.members.last_name}`
+                            : null
+                          const followUpMemberUUID = showAllMembers ? followUp.member_id : memberUUID
+                          
+                          return (
+                            <TableRow key={followUp.id}>
+                              {showAllMembers && (
+                                <TableCell className="font-medium whitespace-nowrap">
+                                  {memberName || "Unknown Member"}
+                                </TableCell>
+                              )}
+                              <TableCell className="font-medium whitespace-nowrap">{formatDate(followUp.date)}</TableCell>
+                              <TableCell className="whitespace-nowrap">{followUp.method}</TableCell>
+                              <TableCell className="!whitespace-normal !break-words pr-4" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' } as React.CSSProperties}>
+                                {followUp.notes}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (followUpMemberUUID) {
+                                      handleDeleteMemberFollowUp(followUp.id, followUpMemberUUID)
+                                    }
+                                  }}
+                                  disabled={deleteMemberFollowUp.isPending}
+                                  title="Delete follow-up"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
                       )}
                     </TableBody>
                   </Table>

@@ -19,6 +19,7 @@ import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/p
 import type { DisposalRecord, Asset } from "./types"
 import type { Account } from "@/app/(dashboard)/dashboard/finance/types"
 import { formatDate } from "./utils"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 
 export default function DisposalContent() {
   const { organization } = useOrganization()
@@ -40,6 +41,8 @@ export default function DisposalContent() {
   const deleteDisposal = useDeleteAssetDisposal()
 
   const isLoading = disposalsLoading || assetsLoading || accountsLoading
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [disposalToDelete, setDisposalToDelete] = useState<DisposalRecord | null>(null)
 
   // Filter assets that are not disposed (available for disposal)
   const disposableAssets = useMemo(() => {
@@ -113,18 +116,22 @@ export default function DisposalContent() {
     }
   }
 
-  const handleDelete = async (disposal: DisposalRecord) => {
-    if (!confirm("This will reverse all actions: delete the income record, subtract the amount from the account balance, and change the asset status back. Are you sure you want to continue?")) {
-      return
-    }
-
+  const handleDeleteClick = (disposal: DisposalRecord) => {
     if (!disposal.uuid) {
       toast.error("Disposal record not found")
       return
     }
+    setDisposalToDelete(disposal)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!disposalToDelete?.uuid) return
 
     try {
-      await deleteDisposal.mutateAsync(disposal.uuid)
+      await deleteDisposal.mutateAsync(disposalToDelete.uuid)
+      setDeleteDialogOpen(false)
+      setDisposalToDelete(null)
     } catch (error) {
       // Error is already handled by the hook (toast)
       console.error("Error deleting disposal:", error)
@@ -292,7 +299,7 @@ export default function DisposalContent() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(disposal)}
+                            onClick={() => handleDeleteClick(disposal)}
                             disabled={deleteDisposal.isPending || createDisposal.isPending}
                           >
                             {deleteDisposal.isPending ? (
@@ -311,6 +318,17 @@ export default function DisposalContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Disposal Record"
+        description="This will reverse all actions: delete the income record, subtract the amount from the account balance, and change the asset status back. Are you sure you want to continue?"
+        confirmText="Delete"
+        isLoading={deleteDisposal.isPending}
+      />
     </div>
   )
 }

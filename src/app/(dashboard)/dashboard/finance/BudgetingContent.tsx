@@ -1,11 +1,12 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Edit, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { useOrganization } from "@/hooks/use-organization"
 import { formatCurrency } from "@/app/(dashboard)/dashboard/projects/utils"
 import type { Budget } from "./types"
@@ -18,9 +19,22 @@ interface BudgetingContentProps {
 
 export default function BudgetingContent({ budgets, setBudgets, onEdit }: BudgetingContentProps) {
   const { organization } = useOrganization()
-  const handleDelete = (id: number) => {
-    setBudgets(budgets.filter(b => b.id !== id))
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null)
+
+  const handleDeleteClick = (id: number) => {
+    const budget = budgets.find(b => b.id === id)
+    if (!budget) return
+    setBudgetToDelete(budget)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = () => {
+    if (!budgetToDelete) return
+    setBudgets(budgets.filter(b => b.id !== budgetToDelete.id))
     toast.success("Budget deleted successfully")
+    setDeleteDialogOpen(false)
+    setBudgetToDelete(null)
   }
 
   const totalBudget = budgets.reduce((sum, b) => sum + (b.budgeted || 0), 0)
@@ -110,7 +124,7 @@ export default function BudgetingContent({ budgets, setBudgets, onEdit }: Budget
                               <Button variant="ghost" size="sm" onClick={() => onEdit(budget)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(budget.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(budget.id)}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             </div>
@@ -125,6 +139,16 @@ export default function BudgetingContent({ budgets, setBudgets, onEdit }: Budget
           </div>
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Budget"
+        description={budgetToDelete ? `Are you sure you want to delete the budget for "${budgetToDelete.category}"?\n\nThis action cannot be undone.` : ""}
+        confirmText="Delete"
+      />
     </Card>
   )
 }

@@ -103,6 +103,7 @@ export function useCreateDepartment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Department created successfully")
     },
     onError: (error: Error) => {
@@ -158,6 +159,7 @@ export function useUpdateDepartment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Department updated successfully")
     },
     onError: (error: Error) => {
@@ -223,6 +225,7 @@ export function useDeleteDepartment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Department deleted successfully")
     },
     onError: (error: Error) => {

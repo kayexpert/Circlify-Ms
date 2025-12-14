@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Edit, Trash2, CheckCircle2, Circle, Calculator, Loader2 } from "lucide-react"
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { cn } from "@/lib/utils"
 import ReconciliationDrawer from "./ReconciliationDrawer"
 import type { Account, IncomeRecord, ExpenditureRecord, ReconciliationRecord } from "./types"
@@ -64,6 +65,8 @@ export default function ReconciliationContent() {
   const [selectedReconciliation, setSelectedReconciliation] = useState<ReconciliationRecord | null>(null)
   const [selectedReconciliationId, setSelectedReconciliationId] = useState<number | null>(null) // Store ID to keep reference stable
   const stableReconciliationRef = useRef<ReconciliationRecord | null>(null) // Stable ref to prevent drawer from closing during refetches
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [reconciliationToDelete, setReconciliationToDelete] = useState<ReconciliationRecord | null>(null)
 
   // UUID lookup helpers
   const getAccountUUID = async (accountId: number): Promise<string | null> => {
@@ -227,10 +230,21 @@ export default function ReconciliationContent() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    const reconciliationUUID = await getReconciliationUUID(id)
+  const handleDeleteClick = (id: number) => {
+    const reconciliation = reconciliationRecords.find((r: ReconciliationRecord) => r.id === id)
+    if (!reconciliation) return
+    setReconciliationToDelete(reconciliation)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!reconciliationToDelete) return
+
+    const reconciliationUUID = await getReconciliationUUID(reconciliationToDelete.id)
     if (!reconciliationUUID) {
       toast.error("Could not find reconciliation to delete")
+      setDeleteDialogOpen(false)
+      setReconciliationToDelete(null)
       return
     }
 
@@ -238,8 +252,12 @@ export default function ReconciliationContent() {
       await deleteReconciliation.mutateAsync(reconciliationUUID)
       // Note: The hook handles unmarking reconciled entries.
       // Entries added during reconciliation will persist (which is likely correct behavior).
+      setDeleteDialogOpen(false)
+      setReconciliationToDelete(null)
     } catch (error) {
       // Error is already handled by the hook (toast)
+      setDeleteDialogOpen(false)
+      setReconciliationToDelete(null)
     }
   }
 
@@ -497,7 +515,7 @@ export default function ReconciliationContent() {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              onClick={() => handleDelete(record.id)}
+                              onClick={() => handleDeleteClick(record.id)}
                               className="text-red-600 hover:text-red-700"
                               disabled={deleteReconciliation.isPending}
                             >
@@ -543,6 +561,17 @@ export default function ReconciliationContent() {
           onUpdate={handleUpdateReconciliation}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Reconciliation"
+        description={reconciliationToDelete ? `Are you sure you want to delete this reconciliation?\n\nAccount: ${reconciliationToDelete.accountName}\nDate: ${reconciliationToDelete.date ? new Date(reconciliationToDelete.date).toLocaleDateString() : "N/A"}\n\nThis will unmark all reconciled entries. This action cannot be undone.` : ""}
+        confirmText="Delete"
+        isLoading={deleteReconciliation.isPending}
+      />
     </div>
   )
 }

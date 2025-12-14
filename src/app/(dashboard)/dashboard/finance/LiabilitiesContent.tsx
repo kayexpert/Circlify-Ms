@@ -11,11 +11,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Edit, Trash2, Search, CreditCard, Eye, Loader2 } from "lucide-react"
+import { Edit, Trash2, Search, CreditCard, Eye, Loader2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Liability, Account } from "./types"
-import { useLiabilitiesPaginated, useCreateLiability, useUpdateLiability, useDeleteLiability, useLiabilityPayments, useCategoriesByType } from "@/hooks/finance"
+import { useLiabilitiesPaginated, useCreateLiability, useUpdateLiability, useDeleteLiability, useLiabilityPayments, useCategoriesByType, useCreateLoan } from "@/hooks/finance"
 import { useAccounts } from "@/hooks/finance/useAccounts"
 import { useCreateExpenditureRecord } from "@/hooks/finance/useExpenditureRecords"
 import { createClient } from "@/lib/supabase/client"
@@ -43,6 +46,7 @@ function isCacheValid(key: string): boolean {
 }
 
 export default function LiabilitiesContent() {
+  const [activeSubTab, setActiveSubTab] = useState<"regular" | "loans">("regular")
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -53,6 +57,8 @@ export default function LiabilitiesContent() {
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false)
   const [selectedLiabilityForHistory, setSelectedLiabilityForHistory] = useState<Liability | null>(null)
   const [selectedLiabilityUUIDForHistory, setSelectedLiabilityUUIDForHistory] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [liabilityToDelete, setLiabilityToDelete] = useState<Liability | null>(null)
   const [formData, setFormData] = useState({
     date: new Date() as Date | undefined,
     category: "",
@@ -61,6 +67,18 @@ export default function LiabilitiesContent() {
     amount: "",
     paidAmount: "",
     initialPaymentAccount: "",
+  })
+  const [loanFormData, setLoanFormData] = useState({
+    date: new Date() as Date | undefined,
+    lender: "",
+    description: "",
+    amountReceived: "",
+    amountPayable: "",
+    interestRate: "",
+    startDate: new Date() as Date | undefined,
+    endDate: undefined as Date | undefined,
+    durationDays: "",
+    account: "",
   })
   const [paymentFormData, setPaymentFormData] = useState({
     account: "",
@@ -77,13 +95,16 @@ export default function LiabilitiesContent() {
   const { organization } = useOrganization()
   const supabase = createClient()
   const queryClient = useQueryClient()
-  const { data: liabilitiesData, isLoading: liabilitiesLoading } = useLiabilitiesPaginated(currentPage, pageSize)
+  // Fetch liabilities based on active sub-tab
+  const isLoanFilter = activeSubTab === "loans" ? true : false
+  const { data: liabilitiesData, isLoading: liabilitiesLoading } = useLiabilitiesPaginated(currentPage, pageSize, true, isLoanFilter)
   const liabilities = liabilitiesData?.data || []
   const totalRecords = liabilitiesData?.total || 0
   const totalPages = liabilitiesData?.totalPages || 0
   const { data: accounts = [], isLoading: accountsLoading } = useAccounts()
   const { data: liabilityCategories = [] } = useCategoriesByType("liability")
   const createLiability = useCreateLiability()
+  const createLoan = useCreateLoan()
   const updateLiability = useUpdateLiability()
   const deleteLiability = useDeleteLiability()
   const createExpenditureRecord = useCreateExpenditureRecord()
@@ -253,17 +274,32 @@ export default function LiabilitiesContent() {
     }
   }, [organization?.id, accounts, supabase])
 
-  const handleDelete = async (id: number) => {
-    const liabilityUUID = await getLiabilityUUID(id)
+  const handleDeleteClick = (id: number) => {
+    const liability = liabilities.find((l: Liability) => l.id === id)
+    if (!liability) return
+    setLiabilityToDelete(liability)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!liabilityToDelete) return
+
+    const liabilityUUID = await getLiabilityUUID(liabilityToDelete.id)
     if (!liabilityUUID) {
       toast.error("Could not find liability to delete")
+      setDeleteDialogOpen(false)
+      setLiabilityToDelete(null)
       return
     }
 
     try {
       await deleteLiability.mutateAsync(liabilityUUID)
+      setDeleteDialogOpen(false)
+      setLiabilityToDelete(null)
     } catch (error) {
       // Error is already handled by the hook (toast)
+      setDeleteDialogOpen(false)
+      setLiabilityToDelete(null)
     }
   }
 
@@ -274,16 +310,29 @@ export default function LiabilitiesContent() {
       return
     }
 
-    // Check if liability has payment records by fetching payments
+    // Fetch all payment records to find the initial payment account
     const { data: payments } = await supabase
       .from("finance_expenditure_records")
-      .select("id")
+      .select("id, method, account_id")
       .eq("linked_liability_id", liabilityUUID)
       .eq("organization_id", organization?.id || "")
-      .limit(1)
+      .order("created_at", { ascending: true }) // Get earliest payment first (initial payment)
 
+    let initialPaymentAccountId = ""
     if (payments && payments.length > 0) {
-      toast.info("This liability has payment records. Paid amount is calculated from payments.")
+      // Get the first payment (initial payment) and find the account by name
+      const initialPayment = payments[0]
+      const initialPaymentAccountName = (initialPayment as any)?.method
+      if (initialPaymentAccountName) {
+        const account = accounts.find(a => a.name === initialPaymentAccountName)
+        if (account) {
+          initialPaymentAccountId = account.id.toString()
+        }
+      }
+      
+      if (payments.length > 0) {
+        toast.info("This liability has payment records. Paid amount is calculated from payments.")
+      }
     }
 
     setEditingId(liability.id)
@@ -295,7 +344,7 @@ export default function LiabilitiesContent() {
       description: liability.description,
       amount: liability.originalAmount.toString(),
       paidAmount: liability.amountPaid.toString(),
-      initialPaymentAccount: "",
+      initialPaymentAccount: initialPaymentAccountId,
     })
   }
 
@@ -324,8 +373,8 @@ export default function LiabilitiesContent() {
     const originalAmount = parseFloat(formData.amount)
     let amountPaid = parseFloat(formData.paidAmount || "0")
     
-    // Validate initial payment account selection
-    if (amountPaid > 0 && !formData.initialPaymentAccount) {
+    // Validate initial payment account selection (only for new liabilities, not when editing)
+    if (!editingId && amountPaid > 0 && !formData.initialPaymentAccount) {
       toast.error("Please select an account for the initial payment")
       return
     }
@@ -484,6 +533,99 @@ export default function LiabilitiesContent() {
         queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization.id] })
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization.id] })
       }
+    }
+  }
+
+  const handleLoanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate required fields
+    if (!loanFormData.date || !loanFormData.lender || !loanFormData.description || 
+        !loanFormData.amountReceived || !loanFormData.amountPayable || !loanFormData.account) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+
+    const amountReceived = parseFloat(loanFormData.amountReceived)
+    const amountPayable = parseFloat(loanFormData.amountPayable)
+    
+    if (isNaN(amountReceived) || amountReceived <= 0) {
+      toast.error("Amount received must be greater than 0")
+      return
+    }
+    
+    if (isNaN(amountPayable) || amountPayable <= 0) {
+      toast.error("Amount payable must be greater than 0")
+      return
+    }
+    
+    if (amountPayable < amountReceived) {
+      toast.error("Amount payable should be greater than or equal to amount received")
+      return
+    }
+
+    const selectedAccount = accounts.find(a => a.id.toString() === loanFormData.account)
+    if (!selectedAccount) {
+      toast.error("Please select a valid account")
+      return
+    }
+
+    // Calculate duration if both dates are provided
+    let durationDays: number | null = null
+    if (loanFormData.startDate && loanFormData.endDate) {
+      const start = new Date(loanFormData.startDate)
+      const end = new Date(loanFormData.endDate)
+      const diffTime = Math.abs(end.getTime() - start.getTime())
+      durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      if (end < start) {
+        toast.error("End date must be after start date")
+        return
+      }
+    }
+
+    try {
+      // Get account UUID
+      const accountUUID = await getAccountUUID(selectedAccount.id)
+      if (!accountUUID) {
+        toast.error("Failed to find account")
+        return
+      }
+
+      // Create loan (creates both income and liability records)
+      await createLoan.mutateAsync({
+        loanData: {
+          date: loanFormData.date!,
+          category: "Loans/Overdrafts", // Default category for loans
+          description: loanFormData.description,
+          lender: loanFormData.lender,
+          amountReceived: amountReceived,
+          amountPayable: amountPayable,
+          interestRate: loanFormData.interestRate ? parseFloat(loanFormData.interestRate) : null,
+          startDate: loanFormData.startDate,
+          endDate: loanFormData.endDate,
+          durationDays: durationDays,
+          accountName: selectedAccount.name,
+        },
+        accountId: accountUUID,
+      })
+
+      // Reset form
+      setLoanFormData({
+        date: new Date(),
+        lender: "",
+        description: "",
+        amountReceived: "",
+        amountPayable: "",
+        interestRate: "",
+        startDate: new Date(),
+        endDate: undefined,
+        durationDays: "",
+        account: "",
+      })
+    } catch (error) {
+      // Error is already handled by the hook (toast)
+      console.error("Error in handleLoanSubmit:", error)
     }
   }
 
@@ -702,12 +844,23 @@ export default function LiabilitiesContent() {
 
   return (
     <>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[400px_1fr]">
-        {/* Form on Left */}
-        <Card  style={{ height: 'fit-content' }}>
-          <CardHeader>
-            <CardTitle>{editingId ? "Edit Liability" : "Add Liability"}</CardTitle>
-          </CardHeader>
+      <Tabs value={activeSubTab} onValueChange={(value) => {
+        setActiveSubTab(value as "regular" | "loans")
+        setCurrentPage(1) // Reset to first page when switching tabs
+        setSearchQuery("") // Clear search when switching tabs
+      }} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="regular">Regular Liabilities</TabsTrigger>
+          <TabsTrigger value="loans">Loans/Overdrafts</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="regular" className="space-y-4">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-[400px_1fr]">
+            {/* Form on Left */}
+            <Card style={{ height: 'fit-content' }}>
+              <CardHeader>
+                <CardTitle>{editingId ? "Edit Liability" : "Add Liability"}</CardTitle>
+              </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1: Date */}
@@ -729,8 +882,17 @@ export default function LiabilitiesContent() {
                   </SelectTrigger>
                   <SelectContent>
                     {liabilityCategories.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No categories available. Add categories first.
+                      <div className="px-2 py-6 text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          No liability categories available
+                        </p>
+                        <Link 
+                          href="/dashboard/finance?tab=categories"
+                          className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                        >
+                          <span>Click here to add liability categories</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
                       </div>
                     ) : (
                       liabilityCategories.map((category) => (
@@ -801,15 +963,18 @@ export default function LiabilitiesContent() {
                 </div>
               </div>
 
-              {/* Initial Payment Account - Show only when paidAmount > 0 and not editing with existing payments */}
-              {parseFloat(formData.paidAmount || "0") > 0 && (!editingId || !editingLiabilityUUID || editingLiabilityPayments.length === 0) && (
+              {/* Initial Payment Account - Show when paidAmount > 0 (always show when editing if there was an initial payment) */}
+              {parseFloat(formData.paidAmount || "0") > 0 && (!editingId || formData.initialPaymentAccount) && (
                 <div className="space-y-2">
-                  <Label htmlFor="initialPaymentAccount">Account for Initial Payment *</Label>
+                  <Label htmlFor="initialPaymentAccount">
+                    Account for Initial Payment {editingId ? "(not editable)" : "*"}
+                  </Label>
                   <Select 
                     value={formData.initialPaymentAccount} 
                     onValueChange={(value) => setFormData({ ...formData, initialPaymentAccount: value })}
+                    disabled={!!editingId}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full" disabled={!!editingId}>
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
@@ -826,6 +991,11 @@ export default function LiabilitiesContent() {
                       )}
                     </SelectContent>
                   </Select>
+                  {editingId && formData.initialPaymentAccount && (
+                    <p className="text-xs text-muted-foreground">
+                      Initial payment account cannot be changed when editing a liability
+                    </p>
+                  )}
                   {formData.initialPaymentAccount && (() => {
                     const selectedAccount = accounts.find(a => a.id.toString() === formData.initialPaymentAccount)
                     const paymentAmount = parseFloat(formData.paidAmount || "0")
@@ -957,7 +1127,7 @@ export default function LiabilitiesContent() {
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(liability)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(liability.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(liability.id)}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             </div>
@@ -990,6 +1160,316 @@ export default function LiabilitiesContent() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="loans" className="space-y-4">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-[400px_1fr]">
+            {/* Loan Form on Left */}
+            <Card style={{ height: 'fit-content' }}>
+              <CardHeader>
+                <CardTitle>Add Loan/Overdraft</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLoanSubmit} className="space-y-4">
+                  {/* Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-date">Date *</Label>
+                    <DatePicker
+                      date={loanFormData.date}
+                      onSelect={(date) => setLoanFormData({ ...loanFormData, date })}
+                      placeholder="Select date"
+                    />
+                  </div>
+
+                  {/* Lender */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-lender">Lender *</Label>
+                    <Input
+                      id="loan-lender"
+                      value={loanFormData.lender}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, lender: e.target.value })}
+                      placeholder="Enter lender name"
+                      required
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-description">Description *</Label>
+                    <Textarea
+                      id="loan-description"
+                      value={loanFormData.description}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, description: e.target.value })}
+                      placeholder="Enter description..."
+                      rows={3}
+                      required
+                    />
+                  </div>
+
+                  {/* Amount Received */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-amount-received">Amount Received ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
+                    <Input
+                      id="loan-amount-received"
+                      type="number"
+                      step="0.01"
+                      value={loanFormData.amountReceived}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, amountReceived: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Amount you received from the loan (goes to income).
+                    </p>
+                  </div>
+
+                  {/* Interest Rate */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-interest-rate">Interest Rate (%)</Label>
+                    <Input
+                      id="loan-interest-rate"
+                      type="number"
+                      step="0.01"
+                      value={loanFormData.interestRate}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, interestRate: e.target.value })}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Annual interest rate as percentage (e.g., 10.5 for 10.5%).
+                    </p>
+                  </div>
+
+                  {/* Start Date and End Date on same row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="loan-start-date">Loan Start Date</Label>
+                      <DatePicker
+                        date={loanFormData.startDate}
+                        onSelect={(date) => {
+                          setLoanFormData({ ...loanFormData, startDate: date })
+                          // Auto-calculate duration if end date exists
+                          if (date && loanFormData.endDate) {
+                            const start = new Date(date)
+                            const end = new Date(loanFormData.endDate)
+                            const diffTime = Math.abs(end.getTime() - start.getTime())
+                            const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                            setLoanFormData(prev => ({ ...prev, durationDays: days.toString() }))
+                          }
+                        }}
+                        placeholder="Select start date"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="loan-end-date">Expected Payment Date</Label>
+                      <DatePicker
+                        date={loanFormData.endDate}
+                        onSelect={(date) => {
+                          setLoanFormData({ ...loanFormData, endDate: date })
+                          // Auto-calculate duration if start date exists
+                          if (date && loanFormData.startDate) {
+                            const start = new Date(loanFormData.startDate)
+                            const end = new Date(date)
+                            const diffTime = Math.abs(end.getTime() - start.getTime())
+                            const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                            setLoanFormData(prev => ({ ...prev, durationDays: days.toString() }))
+                          }
+                        }}
+                        placeholder="Select date"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Duration (auto-calculated, but can be manually entered) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-duration">Duration (Days)</Label>
+                    <Input
+                      id="loan-duration"
+                      type="number"
+                      value={loanFormData.durationDays}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, durationDays: e.target.value })}
+                      placeholder="Auto-calculated from dates"
+                      readOnly={!!(loanFormData.startDate && loanFormData.endDate)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {loanFormData.startDate && loanFormData.endDate 
+                        ? "Automatically calculated from start and end dates."
+                        : "Enter manually or select start and end dates to auto-calculate."}
+                    </p>
+                  </div>
+
+                  {/* Amount Payable */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-amount-payable">Amount Payable ({getCurrencySymbol(organization?.currency || "USD")}) *</Label>
+                    <Input
+                      id="loan-amount-payable"
+                      type="number"
+                      step="0.01"
+                      value={loanFormData.amountPayable}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, amountPayable: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Total amount to be paid back (including interest and fees).
+                    </p>
+                  </div>
+
+                  {/* Account */}
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-account">Account to Receive Funds *</Label>
+                    <Select value={loanFormData.account} onValueChange={(value) => setLoanFormData({ ...loanFormData, account: value })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No accounts available. Add accounts first.
+                          </div>
+                        ) : (
+                          accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name} - {formatCurrency(account.balance || 0, organization?.currency || "USD")}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex gap-2">
+                    <Button type="submit" className="flex-1">
+                      Add Loan
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Loans Table on Right */}
+            <Card className="min-w-0">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4">
+                  <CardTitle>Loans/Overdrafts Records</CardTitle>
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search loans..." 
+                      value={searchQuery} 
+                      onChange={(e) => setSearchQuery(e.target.value)} 
+                      className="pl-10" 
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="min-w-0">
+                <div className="rounded-md border">
+                  <div className="h-[370px] overflow-y-auto overflow-x-auto custom-scrollbar">
+                    <Table className="min-w-[1000px]">
+                      <TableHeader className="sticky top-0 bg-background z-10">
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Lender</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Loan Amount ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
+                          <TableHead>Amount Paid ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
+                          <TableHead>Balance ({getCurrencySymbol(organization?.currency || "USD")})</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLiabilities.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              No loans found.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredLiabilities.map((liability) => (
+                            <TableRow key={liability.id}>
+                              <TableCell>
+                                {formatDate(liability.date)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{liability.category}</Badge>
+                              </TableCell>
+                              <TableCell>{liability.creditor}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground" title={liability.description}>
+                                {truncateText(liability.description || "", 30)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {liability.originalAmount?.toLocaleString() || 0}
+                              </TableCell>
+                              <TableCell className="text-center text-green-600">
+                                {liability.amountPaid?.toLocaleString() || 0}
+                              </TableCell>
+                              <TableCell className="text-center text-red-600">
+                                {liability.balance?.toLocaleString() || 0}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  className={
+                                    liability.status === "Paid" 
+                                      ? "bg-green-500 hover:bg-green-600" 
+                                      : liability.status === "Partially Paid"
+                                      ? "bg-orange-500 hover:bg-orange-600"
+                                      : "bg-red-500 hover:bg-red-600"
+                                  }
+                                >
+                                  {liability.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePayClick(liability)}
+                                    disabled={liability.status === "Paid"}
+                                    title="Make Payment"
+                                  >
+                                    <CreditCard className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleViewPayments(liability)}
+                                    title="View Payment History"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                {totalPages > 1 && (
+                  <div className="mt-4">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      showPageSizeSelector={true}
+                      onPageSizeChange={(newSize) => {
+                        setPageSize(newSize)
+                        setCurrentPage(1)
+                      }}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Payment Drawer */}
       <Sheet open={paymentDrawerOpen} onOpenChange={setPaymentDrawerOpen}>
@@ -1217,6 +1697,17 @@ export default function LiabilitiesContent() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Liability"
+        description={liabilityToDelete ? `Are you sure you want to delete this liability?\n\nCreditor: ${liabilityToDelete.creditor}\nDescription: ${liabilityToDelete.description}\nOriginal Amount: ${getCurrencySymbol(organization?.currency || "USD")}${liabilityToDelete.originalAmount?.toLocaleString() || 0}\n\nThis will also delete all related payment records. This action cannot be undone.` : ""}
+        confirmText="Delete"
+        isLoading={deleteLiability.isPending}
+      />
     </>
   )
 }

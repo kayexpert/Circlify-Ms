@@ -10,9 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Edit, Trash2, Search, Loader2 } from "lucide-react"
+import { Edit, Trash2, Search, Loader2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { useExpenditureRecordsPaginated, useCreateExpenditureRecord, useUpdateExpenditureRecord, useDeleteExpenditureRecord } from "@/hooks/finance"
 import { useAccounts } from "@/hooks/finance"
 import { useCategoriesByType } from "@/hooks/finance"
@@ -46,6 +48,8 @@ export default function ExpenditureContent() {
 
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [recordToDelete, setRecordToDelete] = useState<ExpenditureRecord | null>(null)
   
   // Debounce search query and reset to page 1 when search changes
   useEffect(() => {
@@ -167,21 +171,27 @@ export default function ExpenditureContent() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    const recordToDelete = expenditureRecords.find((r: ExpenditureRecord) => r.id === id)
-    if (!recordToDelete) {
+  const handleDeleteClick = (id: number) => {
+    const record = expenditureRecords.find((r: ExpenditureRecord) => r.id === id)
+    if (!record) {
       toast.error("Record not found in local data")
       return
     }
+    setRecordToDelete(record)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!recordToDelete) return
 
     try {
       // Get UUIDs with better error reporting
-      const recordUUID = await getExpenditureRecordUUID(id)
+      const recordUUID = await getExpenditureRecordUUID(recordToDelete.id)
       const accountUUID = await getAccountUUIDByName(recordToDelete.method)
 
       if (!recordUUID) {
         console.error("Failed to find expenditure record UUID for:", {
-          id,
+          id: recordToDelete.id,
           category: recordToDelete.category,
           amount: recordToDelete.amount,
           method: recordToDelete.method,
@@ -189,12 +199,16 @@ export default function ExpenditureContent() {
           description: recordToDelete.description
         })
         toast.error("Failed to find record UUID. Please refresh the page and try again.")
+        setDeleteDialogOpen(false)
+        setRecordToDelete(null)
         return
       }
 
       if (!accountUUID) {
         console.error("Failed to find account UUID for:", recordToDelete.method)
         toast.error(`Failed to find account "${recordToDelete.method}". Please refresh the page and try again.`)
+        setDeleteDialogOpen(false)
+        setRecordToDelete(null)
         return
       }
 
@@ -223,12 +237,22 @@ export default function ExpenditureContent() {
         amount: recordToDelete.amount,
         linkedLiabilityId: liabilityUUID,
       })
+      setDeleteDialogOpen(false)
+      setRecordToDelete(null)
     } catch (error) {
       // Error handled by hook
+      setDeleteDialogOpen(false)
+      setRecordToDelete(null)
     }
   }
 
   const handleEdit = async (record: ExpenditureRecord) => {
+    // Prevent editing Liabilities category records
+    if (record.category === "Liabilities") {
+      toast.error("Liabilities category records cannot be edited")
+      return
+    }
+
     // Find the account ID from the account name
     const account = accounts.find((a: Account) => a.name === record.method)
     setEditingId(record.id)
@@ -397,11 +421,26 @@ export default function ExpenditureContent() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {categories.length === 0 ? (
+                    <div className="px-2 py-6 text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        No expense categories available
+                      </p>
+                      <Link 
+                        href="/dashboard/finance?tab=categories"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                      >
+                        <span>Click here to add expense categories</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  ) : (
+                    categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -542,10 +581,16 @@ export default function ExpenditureContent() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)}>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleEdit(record)}
+                              disabled={record.category === "Liabilities"}
+                              title={record.category === "Liabilities" ? "Liabilities category records cannot be edited" : "Edit record"}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(record.id)}>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(record.id)}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
@@ -578,6 +623,17 @@ export default function ExpenditureContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Expenditure Record"
+        description={recordToDelete ? `Are you sure you want to delete this expenditure record?\n\nDate: ${formatDate(recordToDelete.date)}\nCategory: ${recordToDelete.category}\nAmount: ${getCurrencySymbol(organization?.currency || "USD")}${recordToDelete.amount?.toLocaleString() || 0}\n\nThis action cannot be undone.` : ""}
+        confirmText="Delete"
+        isLoading={deleteExpenditureRecord.isPending}
+      />
     </div>
   )
 }

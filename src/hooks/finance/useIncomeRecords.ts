@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "../use-organization"
 import { toast } from "sonner"
-import { personalizeMessage, formatPhoneNumber, calculateSMSCost } from "@/app/(dashboard)/dashboard/messaging/utils"
+import { sendContributionNotification, shouldSendContributionNotification } from "@/lib/services/notification.service"
 import type { FinanceIncomeRecord, FinanceIncomeRecordInsert, FinanceIncomeRecordUpdate } from "@/types/database-extension"
 import type { IncomeRecord } from "@/app/(dashboard)/dashboard/finance/types"
 
@@ -21,6 +21,7 @@ function convertIncomeRecord(record: FinanceIncomeRecord): IncomeRecord {
     memberId: record.member_id ? parseInt(record.member_id.split("-")[0], 16) : undefined,
     memberName: record.member_name || undefined,
     linkedAssetId: record.linked_asset_id ? parseInt(record.linked_asset_id.split("-")[0], 16) : undefined,
+    linkedLiabilityId: record.linked_liability_id ? parseInt(record.linked_liability_id.split("-")[0], 16) : undefined,
     reconciledInReconciliation: record.reconciled_in_reconciliation ? parseInt(record.reconciled_in_reconciliation.split("-")[0], 16) : null,
     isReconciled: record.is_reconciled || false,
   }
@@ -31,7 +32,8 @@ function convertToDatabaseFormat(
   record: Partial<IncomeRecord>, 
   organizationId: string, 
   accountId: string,
-  memberId?: string | null
+  memberId?: string | null,
+  linkedLiabilityId?: string | null
 ): Partial<FinanceIncomeRecordInsert> {
   return {
     organization_id: organizationId,
@@ -45,6 +47,7 @@ function convertToDatabaseFormat(
     member_id: memberId || null,
     member_name: record.memberName || null,
     linked_asset_id: record.linkedAssetId ? undefined : null, // Will need UUID conversion if needed
+    linked_liability_id: linkedLiabilityId || null,
     is_reconciled: record.isReconciled || false,
   }
 }
@@ -65,7 +68,7 @@ export function useIncomeRecords(enabled: boolean = true) {
 
       const { data, error } = await supabase
         .from("finance_income_records")
-        .select("id, date, source, category, amount, method, reference, member_id, member_name, linked_asset_id, reconciled_in_reconciliation, is_reconciled")
+        .select("id, date, source, category, amount, method, reference, member_id, member_name, linked_asset_id, linked_liability_id, reconciled_in_reconciliation, is_reconciled")
         .eq("organization_id", organization.id)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
@@ -103,7 +106,7 @@ export function useIncomeRecordsPaginated(page: number = 1, pageSize: number = 2
       const [dataResult, countResult] = await Promise.all([
         supabase
           .from("finance_income_records")
-          .select("id, date, source, category, amount, method, reference, member_id, member_name, linked_asset_id, reconciled_in_reconciliation, is_reconciled")
+          .select("id, date, source, category, amount, method, reference, member_id, member_name, linked_asset_id, linked_liability_id, reconciled_in_reconciliation, is_reconciled")
           .eq("organization_id", organization.id)
           .order("date", { ascending: false })
           .order("created_at", { ascending: false })
@@ -158,7 +161,7 @@ export function useCreateIncomeRecord() {
         throw new Error("No organization selected")
       }
 
-      const dbData = convertToDatabaseFormat(recordData, organization.id, accountId, memberId) as FinanceIncomeRecordInsert
+      const dbData = convertToDatabaseFormat(recordData, organization.id, accountId, memberId, recordData.linkedLiabilityId ? undefined : null) as FinanceIncomeRecordInsert
 
       const { data, error } = await (supabase
         .from("finance_income_records") as any)
@@ -201,251 +204,93 @@ export function useCreateIncomeRecord() {
       toast.error(err.message || "Failed to create income record")
     },
     onSuccess: async (createdRecord, variables) => {
-      // Invalidate and refetch accounts to ensure balance is updated
+      // Invalidate and refetch all related queries to ensure immediate updates
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
       ])
-      // Force refetch accounts immediately
-      await queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] })
+      // Force immediate refetch of all queries (not just active) to ensure account statements and all related data update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+      ])
       toast.success("Income record created successfully")
 
       // Send contribution notification if enabled and record has a member
-      if (variables.memberId && organization?.id) {
+      // Use notification service for better maintainability and error handling
+      if (variables.memberId && organization?.id && variables.recordData.category) {
         try {
-          // Check if the category tracks members (indicating it's a contribution)
-          const { data: category } = await supabase
-            .from("finance_categories")
-            .select("track_members")
-            .eq("organization_id", organization.id)
-            .eq("name", variables.recordData.category)
-            .eq("type", "income")
-            .maybeSingle()
+          // Check if notification should be sent (optimized early exit)
+          const shouldSend = await shouldSendContributionNotification(
+            organization.id,
+            variables.recordData.category
+          )
 
-          // Only send notification if category tracks members (it's a contribution)
-          if (!(category as any)?.track_members) {
-            return
-          }
-
-          // Check if contribution notifications are enabled
-          const { data: notificationSettings } = await supabase
-            .from("messaging_notification_settings")
-            .select("contribution_notifications_enabled, contribution_template_id")
-            .eq("organization_id", organization.id)
-            .maybeSingle()
-
-          if ((notificationSettings as any)?.contribution_notifications_enabled) {
-            // Get active API configuration
-            const { data: activeApiConfig } = await supabase
-              .from("messaging_api_configurations")
-              .select("*")
-              .eq("organization_id", organization.id)
-              .eq("is_active", true)
-              .maybeSingle()
-
-            if (!activeApiConfig) {
-              console.log("No active API configuration found for contribution notification")
-              return
-            }
-
-            // Get member data including phone number
-            const { data: member } = await supabase
-              .from("members")
-              .select("id, first_name, last_name, phone_number")
-              .eq("id", variables.memberId)
-              .eq("organization_id", organization.id)
-              .maybeSingle()
-
-            if (!member || !(member as any).phone_number) {
-              console.log("Member not found or no phone number for contribution notification")
-              return
-            }
-
-            // Get template if configured
-            let messageText = `Thank you for your contribution of ${variables.recordData.amount?.toLocaleString() || 0} ${organization.currency || "USD"} on ${new Date(variables.recordData.date).toLocaleDateString()}. We appreciate your support!`
-            
-            if ((notificationSettings as any).contribution_template_id) {
-              const { data: template } = await supabase
-                .from("messaging_templates")
-                .select("message")
-                .eq("id", (notificationSettings as any).contribution_template_id)
-                .eq("organization_id", organization.id)
-                .maybeSingle()
-
-              if ((template as any)?.message) {
-                messageText = personalizeMessage((template as any).message, {
-                  FirstName: (member as any).first_name || "",
-                  LastName: (member as any).last_name || "",
-                  PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
-                  Amount: (variables.recordData.amount || 0).toLocaleString(),
-                  Currency: organization.currency || "USD",
-                  Date: new Date(variables.recordData.date).toLocaleDateString(),
-                  Category: variables.recordData.category || "",
-                })
-              }
-            } else {
-              // Personalize default message
-              messageText = personalizeMessage(messageText, {
-                FirstName: (member as any).first_name || "",
-                LastName: (member as any).last_name || "",
-                PhoneNumber: formatPhoneNumber((member as any).phone_number) || (member as any).phone_number,
-                Amount: (variables.recordData.amount || 0).toLocaleString(),
-                Currency: organization.currency || "GHS",
-                Date: new Date(variables.recordData.date).toLocaleDateString(),
-                Category: variables.recordData.category || "",
-              })
-            }
-
-            // Get current user for created_by
-            const {
-              data: { user },
-            } = await supabase.auth.getUser()
-            if (!user) {
-              console.log("User not authenticated for contribution notification")
-              return
-            }
-
-            // Calculate cost
-            const cost = calculateSMSCost(messageText.length, 1)
-
-            // Create message record
-            const { data: message, error: messageError } = await supabase
-              .from("messaging_messages")
-              .insert({
-                organization_id: organization.id,
-                message_name: `Contribution Notification - ${(member as any).first_name} ${(member as any).last_name}`,
-                message_text: messageText,
-                recipient_type: "individual",
-                recipient_count: 1,
-                status: "Sending",
-                template_id: (notificationSettings as any).contribution_template_id || null,
-                api_configuration_id: (activeApiConfig as any).id,
-                cost: cost,
-                created_by: user.id,
-              } as never)
-              .select()
-              .single()
-
-            if (messageError) {
-              console.error("Error creating contribution notification message:", messageError)
-              return
-            }
-
-            // Create recipient record
-            const formattedPhone = formatPhoneNumber((member as any).phone_number)
-            const { error: recipientError } = await supabase
-              .from("messaging_message_recipients")
-              .insert({
-                message_id: (message as any).id,
-                recipient_type: "member",
-                recipient_id: (member as any).id,
-                phone_number: formattedPhone || (member as any).phone_number,
-                recipient_name: `${(member as any).first_name} ${(member as any).last_name}`,
-                personalized_message: messageText,
-                status: "Pending",
-                cost: cost,
-              } as never)
-
-            if (recipientError) {
-              console.error("Error creating recipient record:", recipientError)
-            }
-
-            // Send the message
-            try {
-              const destinations = [{
-                phone: formattedPhone || (member as any).phone_number,
-                message: messageText,
-                msgid: `MSG_${(message as any).id}_${(member as any).id}_${Date.now()}`,
-              }]
-
-              const batchResponse = await fetch("/api/messaging/send-sms", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  apiKey: (activeApiConfig as any).api_key,
-                  username: (activeApiConfig as any).username || (activeApiConfig as any).api_key,
-                  senderId: (activeApiConfig as any).sender_id,
-                  destinations,
-                }),
-              })
-
-              const batchResult = await batchResponse.json()
-
-              const responseMessage = batchResult.message || batchResult.error?.message || ""
-              const isAcceptedMessage = responseMessage.toLowerCase().includes("accepted") || 
-                                       responseMessage.toLowerCase().includes("processing")
-              
-              const isSuccess = batchResponse.ok && (
-                batchResult.success === true || 
-                isAcceptedMessage ||
-                (batchResult.data && !batchResult.error)
-              )
-
-              if (isSuccess) {
-                // Update message and recipient status
-                await supabase
-                  .from("messaging_messages")
-                  .update({
-                    status: "Sent",
-                    sent_at: new Date().toISOString(),
-                  } as never)
-                  .eq("id", (message as any).id)
-
-                await supabase
-                  .from("messaging_message_recipients")
-                  .update({
-                    status: "Sent",
-                    sent_at: new Date().toISOString(),
-                  } as never)
-                  .eq("message_id", (message as any).id)
-
-                // Invalidate messaging queries
-                await queryClient.invalidateQueries({ queryKey: ["messaging_messages", organization.id] })
-                await queryClient.invalidateQueries({ queryKey: ["messaging_analytics", organization.id] })
-                await queryClient.invalidateQueries({ queryKey: ["messaging_balance", organization.id] })
+          if (shouldSend && variables.recordData.amount) {
+            // Ensure date is properly formatted
+            let notificationDate: Date | string = variables.recordData.date
+            if (!notificationDate) {
+              notificationDate = new Date()
+            } else if (typeof notificationDate === 'string') {
+              // Validate date string
+              const dateObj = new Date(notificationDate)
+              if (isNaN(dateObj.getTime())) {
+                console.warn("Invalid date format for contribution notification, using current date")
+                notificationDate = new Date()
               } else {
-                const errorMessage = 
-                  batchResult.error?.message || 
-                  batchResult.error || 
-                  (typeof batchResult.error === "string" ? batchResult.error : null) ||
-                  batchResult.message ||
-                  "Failed to send SMS"
-
-                await supabase
-                  .from("messaging_messages")
-                  .update({
-                    status: "Failed",
-                    error_message: errorMessage,
-                  } as never)
-                  .eq("id", (message as any).id)
-
-                await supabase
-                  .from("messaging_message_recipients")
-                  .update({
-                    status: "Failed",
-                    error_message: errorMessage,
-                  } as never)
-                  .eq("message_id", (message as any).id)
-
-                console.error("Failed to send contribution notification:", errorMessage)
+                notificationDate = dateObj
               }
-            } catch (sendError) {
-              console.error("Error sending contribution notification:", sendError)
-              await supabase
-                .from("messaging_messages")
-                .update({
-                  status: "Failed",
-                  error_message: sendError instanceof Error ? sendError.message : "Failed to send SMS",
-                } as never)
-                .eq("id", (message as any).id)
             }
+            
+            // Send notification asynchronously - don't block the UI
+            sendContributionNotification({
+              organizationId: organization.id,
+              memberId: variables.memberId,
+              amount: Number(variables.recordData.amount),
+              date: notificationDate,
+              category: variables.recordData.category,
+              currency: organization.currency,
+            })
+              .then((result) => {
+                if (result.success) {
+                  // Invalidate messaging queries on success
+                  queryClient.invalidateQueries({ queryKey: ["messaging_messages", organization.id] })
+                  queryClient.invalidateQueries({ queryKey: ["messaging_analytics", organization.id] })
+                  queryClient.invalidateQueries({ queryKey: ["messaging_balance", organization.id] })
+                } else {
+                  // Log error with more details
+                  console.warn("Failed to send contribution notification:", {
+                    error: result.error,
+                    organizationId: organization.id,
+                    memberId: variables.memberId,
+                    amount: variables.recordData.amount,
+                  })
+                }
+              })
+              .catch((error) => {
+                // Log error but don't fail the income record creation
+                console.error("Error sending contribution notification:", {
+                  error: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                  organizationId: organization.id,
+                  memberId: variables.memberId,
+                })
+              })
           }
         } catch (error) {
-          // Don't fail the income record creation if notification fails
-          console.error("Error sending contribution notification:", error)
+          // Don't fail the income record creation if notification check fails
+          console.error("Error checking contribution notification:", error)
         }
       }
     },
@@ -530,6 +375,21 @@ export function useUpdateIncomeRecord() {
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+      ])
+      // Force immediate refetch of all queries (not just active) to ensure account statements and all related data update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Income record updated successfully")
     },
@@ -575,6 +435,21 @@ export function useDeleteIncomeRecord() {
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_income_records", "paginated", organization?.id] }),
         queryClient.invalidateQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+      ])
+      // Force immediate refetch of all queries (not just active) to ensure account statements and all related data update
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["finance_income_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_accounts", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_expenditure_records", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_transfers", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_liabilities", "paginated", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_overview", organization?.id] }),
+        queryClient.refetchQueries({ queryKey: ["finance_monthly_trends", organization?.id] }),
       ])
       toast.success("Income record deleted successfully")
     },

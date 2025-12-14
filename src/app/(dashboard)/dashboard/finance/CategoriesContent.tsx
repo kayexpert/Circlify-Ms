@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Edit, Trash2, Search } from "lucide-react"
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { useCategoriesByType, useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/finance"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "@/hooks/use-organization"
@@ -27,6 +28,8 @@ export default function CategoriesContent() {
     description: "",
     trackMembers: false,
   })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: number; name: string } | null>(null)
 
   const { organization } = useOrganization()
   const supabase = createClient()
@@ -109,16 +112,31 @@ export default function CategoriesContent() {
     })
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteClick = (id: number) => {
+    const category = getCurrentCategories().find(c => c.id === id)
+    if (!category) return
+    setCategoryToDelete({ id, name: category.name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete) return
+
     try {
-      const categoryUUID = await getCategoryUUID(id, activeTab)
+      const categoryUUID = await getCategoryUUID(categoryToDelete.id, activeTab)
       if (!categoryUUID) {
         toast.error("Category not found")
+        setDeleteDialogOpen(false)
+        setCategoryToDelete(null)
         return
       }
       await deleteCategory.mutateAsync(categoryUUID)
+      setDeleteDialogOpen(false)
+      setCategoryToDelete(null)
     } catch (error) {
       // Error handled by hook
+      setDeleteDialogOpen(false)
+      setCategoryToDelete(null)
     }
   }
 
@@ -325,28 +343,26 @@ export default function CategoriesContent() {
                               )}
                               <TableCell>
                                 <div className="flex gap-2">
+                                  {!isDefaultCategory(category.name, activeTab) && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={() => handleEdit(category)}
+                                      disabled={
+                                        editingId === category.id || 
+                                        deleteCategory.isPending
+                                      }
+                                      title="Edit category"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    onClick={() => handleEdit(category)}
-                                    disabled={
-                                      editingId === category.id || 
-                                      deleteCategory.isPending || 
-                                      isDefaultCategory(category.name, activeTab)
-                                    }
-                                    title={isDefaultCategory(category.name, activeTab) ? "Default system categories cannot be edited" : "Edit category"}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={() => handleDelete(category.id)}
-                                    disabled={
-                                      deleteCategory.isPending || 
-                                      isDefaultCategory(category.name, activeTab)
-                                    }
-                                    title={isDefaultCategory(category.name, activeTab) ? "Default system categories cannot be deleted" : "Delete category"}
+                                    onClick={() => handleDeleteClick(category.id)}
+                                    disabled={deleteCategory.isPending}
+                                    title={isDefaultCategory(category.name, activeTab) ? "Delete category and all related records" : "Delete category"}
                                   >
                                     {deleteCategory.isPending ? (
                                       <Spinner size="sm" className="text-red-500" />
@@ -368,6 +384,17 @@ export default function CategoriesContent() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Category"
+        description={categoryToDelete ? `Are you sure you want to delete the category "${categoryToDelete.name}"?${isDefaultCategory(categoryToDelete.name, activeTab) ? "\n\nThis is a default system category. Deleting it will also delete all related income/expenditure records and linked entries." : "\n\nThis action cannot be undone."}` : ""}
+        confirmText="Delete"
+        isLoading={deleteCategory.isPending}
+      />
     </div>
   )
 }

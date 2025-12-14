@@ -6,17 +6,26 @@
 import imageCompression from 'browser-image-compression'
 
 export interface CompressionOptions {
-  maxSizeMB?: number // Maximum size in MB (default: 0.5)
-  maxWidthOrHeight?: number // Maximum width or height in pixels (default: 1920)
+  maxSizeMB?: number // Maximum size in MB (default: 0.2)
+  maxWidthOrHeight?: number // Maximum width or height in pixels (default: 800)
   useWebWorker?: boolean // Use web worker for non-blocking compression (default: true)
   fileType?: string // Output file type (default: 'image/jpeg')
 }
 
 const DEFAULT_OPTIONS: CompressionOptions = {
-  maxSizeMB: 0.5, // 500KB
-  maxWidthOrHeight: 1920,
+  maxSizeMB: 0.2, // 200KB - Optimized for profile photos
+  maxWidthOrHeight: 800, // Reduced from 1920 for profile photos (800px is sufficient)
+  useWebWorker: true,
+  fileType: 'image/jpeg', // JPEG is more efficient than PNG for photos
+}
+
+// Aggressive compression for profile photos (even smaller)
+export const PROFILE_PHOTO_OPTIONS: CompressionOptions = {
+  maxSizeMB: 0.15, // 150KB - Very small for profile photos
+  maxWidthOrHeight: 800, // 800px is perfect for profile photos
   useWebWorker: true,
   fileType: 'image/jpeg',
+  // initialQuality removed - use quality parameter in compress function instead
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, lazy, Suspense } from "react"
+import React, { useState, useEffect, lazy, Suspense, useCallback } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -16,9 +17,17 @@ const DisposalContent = lazy(() => import("./DisposalContent").then(m => ({ defa
 const CategoriesContent = lazy(() => import("./CategoriesContent").then(m => ({ default: m.default })))
 const DisposalDrawer = lazy(() => import("./DisposalDrawer").then(m => ({ default: m.default })))
 
+const VALID_TABS = ["overview", "disposal", "categories"] as const
+
 export function AssetManagementPageClient() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
   // State
-  const [activeTab, setActiveTab] = useState<"overview" | "disposal" | "categories">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "disposal" | "categories">(
+    (tabParam && VALID_TABS.includes(tabParam as any) ? tabParam : "overview") as "overview" | "disposal" | "categories"
+  )
   const [assets, setAssets] = useState<Asset[]>([])
   const [disposals, setDisposals] = useState<DisposalRecord[]>([])
   const [categories, setCategories] = useState<AssetCategory[]>([])
@@ -30,6 +39,33 @@ export function AssetManagementPageClient() {
   const [statusFilter, setStatusFilter] = useState<"All" | "Available" | "Retired" | "Maintained" | "Disposed">("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [categorySearchQuery, setCategorySearchQuery] = useState("")
+
+  // Update tab when URL parameter changes
+  useEffect(() => {
+    if (tabParam && VALID_TABS.includes(tabParam as any)) {
+      setActiveTab(tabParam as typeof activeTab)
+    } else if (!tabParam) {
+      // If no tab param, default to overview
+      setActiveTab("overview")
+    }
+  }, [tabParam])
+
+  // Handle tab change - update both state and URL
+  const handleTabChange = useCallback((value: string) => {
+    if (VALID_TABS.includes(value as any)) {
+      setActiveTab(value as typeof activeTab)
+      // Update URL without causing a full page reload
+      const params = new URLSearchParams(searchParams.toString())
+      if (value === "overview") {
+        // Remove tab param for overview (default tab)
+        params.delete("tab")
+      } else {
+        params.set("tab", value)
+      }
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      router.replace(newUrl, { scroll: false })
+    }
+  }, [router, pathname, searchParams])
 
   // Income records hook
   // Note: Income records are now managed by database hooks in DisposalDrawer
@@ -569,7 +605,7 @@ export function AssetManagementPageClient() {
   return (
     <div className="space-y-6">
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="disposal">Disposal</TabsTrigger>

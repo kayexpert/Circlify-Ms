@@ -52,8 +52,8 @@ export function useCreateProject() {
         throw new Error("Organization not found")
       }
 
-      const { data, error } = await supabase
-        .from("projects")
+      const { data, error } = await (supabase
+        .from("projects") as any)
         .insert({
           ...projectData,
           organization_id: organization.id,
@@ -95,8 +95,8 @@ export function useUpdateProject() {
         throw new Error("Organization not found")
       }
 
-      const { data, error } = await supabase
-        .from("projects")
+      const { data, error } = await (supabase
+        .from("projects") as any)
         .update({
           ...updateData,
           updated_at: new Date().toISOString(),

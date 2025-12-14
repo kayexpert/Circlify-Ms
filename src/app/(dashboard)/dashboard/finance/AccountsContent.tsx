@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,7 +18,7 @@ import { Plus, FileText, Trash2, Loader2, Building2, Wallet, Edit, RefreshCw } f
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
 import { useAccounts, useCreateAccount, useUpdateAccount, useDeleteAccount, useRecalculateAccountBalances } from "@/hooks/finance"
-import { useIncomeRecords, useCreateIncomeRecord } from "@/hooks/finance"
+import { useIncomeRecords, useCreateIncomeRecord, useDeleteIncomeRecord } from "@/hooks/finance"
 import { useExpenditureRecords } from "@/hooks/finance"
 import { useTransfers, useCreateTransfer } from "@/hooks/finance"
 import { createClient } from "@/lib/supabase/client"
@@ -51,6 +51,7 @@ export default function AccountsContent() {
   const updateAccount = useUpdateAccount()
   const deleteAccount = useDeleteAccount()
   const createIncomeRecord = useCreateIncomeRecord()
+  const deleteIncomeRecord = useDeleteIncomeRecord()
   const recalculateBalances = useRecalculateAccountBalances()
   
   const [formData, setFormData] = useState({
@@ -88,6 +89,26 @@ export default function AccountsContent() {
     const account = accounts.find((a: Account) => a.id === numberId)
     if (!account) return null
     return getAccountUUIDByName(account.name)
+  }
+
+  // Helper to get income record UUID by number ID
+  const getIncomeRecordUUID = async (recordId: number): Promise<string | null> => {
+    if (!organization?.id) return null
+    const record = incomeRecords.find((r: any) => r.id === recordId)
+    if (!record) return null
+    
+    const { data, error } = await supabase
+      .from("finance_income_records")
+      .select("id")
+      .eq("organization_id", organization.id)
+      .eq("category", record.category)
+      .eq("date", record.date instanceof Date ? record.date.toISOString().split("T")[0] : record.date)
+      .eq("amount", record.amount)
+      .eq("method", record.method)
+      .maybeSingle()
+    
+    if (error || !data) return null
+    return (data as { id: string }).id || null
   }
 
   const handleAddAccount = () => {
@@ -240,16 +261,44 @@ export default function AccountsContent() {
         return
       }
 
-      // Check if account has any transactions
-      const hasIncomeRecords = incomeRecords.some(r => r.method === accountToDelete.name)
+      // Check if account has any non-opening-balance transactions
+      const hasNonOpeningBalanceIncome = incomeRecords.some(
+        r => r.method === accountToDelete.name && r.category !== "Opening Balance"
+      )
       const hasExpenditureRecords = expenditureRecords.some(r => r.method === accountToDelete.name)
       const hasTransfers = transfers.some(t => 
         t.fromAccountId === accountToDelete.id || t.toAccountId === accountToDelete.id
       )
 
-      if (hasIncomeRecords || hasExpenditureRecords || hasTransfers) {
+      if (hasNonOpeningBalanceIncome || hasExpenditureRecords || hasTransfers) {
         toast.error("Cannot delete account with transaction history. Please delete all related records first.")
         return
+      }
+
+      // Delete opening balance records for this account before deleting the account
+      const openingBalanceRecords = incomeRecords.filter(
+        r => r.method === accountToDelete.name && r.category === "Opening Balance"
+      )
+
+      if (openingBalanceRecords.length > 0) {
+        for (const record of openingBalanceRecords) {
+          const recordUUID = await getIncomeRecordUUID(record.id)
+          if (recordUUID) {
+            const accountUUIDForRecord = await getAccountUUIDByName(record.method)
+            if (accountUUIDForRecord) {
+              try {
+                await deleteIncomeRecord.mutateAsync({
+                  id: recordUUID,
+                  accountId: accountUUIDForRecord,
+                  amount: record.amount,
+                })
+              } catch (error) {
+                console.error("Error deleting opening balance record:", error)
+                // Continue with other records even if one fails
+              }
+            }
+          }
+        }
       }
 
       await deleteAccount.mutateAsync(accountUUID)
@@ -996,26 +1045,15 @@ export default function AccountsContent() {
       </Sheet>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Account</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{accountToDelete?.name}"? This action cannot be undone.
-              <br /><br />
-              <strong className="text-destructive">Warning:</strong> This will permanently delete all income and expenditure records associated with this account, as well as any transfer records involving this account.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleDeleteConfirm}>
-              Delete Account
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Account"
+        description={accountToDelete ? `Are you sure you want to delete the account "${accountToDelete.name}"?\n\nWarning: This will permanently delete all income and expenditure records associated with this account, as well as any transfer records involving this account.\n\nThis action cannot be undone.` : ""}
+        confirmText="Delete Account"
+        isLoading={deleteAccount.isPending}
+      />
     </div>
   )
 }

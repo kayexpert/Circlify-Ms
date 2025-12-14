@@ -492,7 +492,7 @@ export function EventsPageClient() {
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
                   initialView="dayGridMonth"
                   headerToolbar={{
-                    left: "prev,next addEventButton",
+                    left: "prev,next",
                     center: "title",
                     right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
                   }}
@@ -501,15 +501,6 @@ export function EventsPageClient() {
                   select={handleDateSelect}
                   eventClick={handleEventClick}
                   eventContent={renderEventContent}
-                  customButtons={{
-                    addEventButton: {
-                      text: "Add Event +",
-                      click: () => {
-                              resetEventForm()
-                              setIsEventSheetOpen(true)
-                      },
-                    },
-                  }}
                 />
               </div>
             </CardContent>

@@ -103,6 +103,7 @@ export function useCreateGroup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["groups", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Group created successfully")
     },
     onError: (error: Error) => {
@@ -158,6 +159,7 @@ export function useUpdateGroup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["groups", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Group updated successfully")
     },
     onError: (error: Error) => {
@@ -223,6 +225,7 @@ export function useDeleteGroup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["groups", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
       toast.success("Group deleted successfully")
     },
     onError: (error: Error) => {

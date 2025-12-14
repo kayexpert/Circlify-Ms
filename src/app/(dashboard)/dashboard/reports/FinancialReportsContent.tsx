@@ -655,13 +655,13 @@ export default function FinancialReportsContent() {
             </CardHeader>
             <CardContent>
               {reportType === "financial-statement" ? (
-                <FinancialStatementView data={balanceSheetData} />
+                <FinancialStatementView data={balanceSheetData} currency={currency} />
               ) : reportType === "income-statement" ? (
-                <IncomeStatementView summary={summary} dateRange={dateRange} records={filteredIncome} />
+                <IncomeStatementView summary={summary} dateRange={dateRange} records={filteredIncome} currency={currency} />
               ) : reportType === "expenditure-statement" ? (
-                <ExpenditureStatementView summary={summary} dateRange={dateRange} records={filteredExpenditure} />
+                <ExpenditureStatementView summary={summary} dateRange={dateRange} records={filteredExpenditure} currency={currency} />
               ) : (
-                <LiabilityStatementView liabilities={filteredLiabilities} dateRange={dateRange} />
+                <LiabilityStatementView liabilities={filteredLiabilities} dateRange={dateRange} currency={currency} />
               )}
             </CardContent>
           </Card>
@@ -688,7 +688,7 @@ export default function FinancialReportsContent() {
 }
 
 // Financial Statement (Balance Sheet) View Component
-function FinancialStatementView({ data }: { data: BalanceSheetData }) {
+function FinancialStatementView({ data, currency }: { data: BalanceSheetData; currency: string }) {
   // Calculate Financial Health
   const financialHealth = useMemo(() => {
     const netWorth = data.totalAssets - data.totalLiabilities
@@ -924,10 +924,12 @@ function IncomeStatementView({
   summary,
   dateRange,
   records,
+  currency,
 }: {
   summary: FinancialSummary
   dateRange: DateRange
   records: IncomeRecord[]
+  currency: string
 }) {
   const [categoryPage, setCategoryPage] = useState(1)
   const [categoryPageSize, setCategoryPageSize] = useState(10)
@@ -1097,10 +1099,12 @@ function ExpenditureStatementView({
   summary,
   dateRange,
   records,
+  currency,
 }: {
   summary: FinancialSummary
   dateRange: DateRange
   records: ExpenditureRecord[]
+  currency: string
 }) {
   const [categoryPage, setCategoryPage] = useState(1)
   const [categoryPageSize, setCategoryPageSize] = useState(10)
@@ -1268,9 +1272,11 @@ function ExpenditureStatementView({
 function LiabilityStatementView({
   liabilities,
   dateRange,
+  currency,
 }: {
   liabilities: Liability[]
   dateRange: DateRange
+  currency: string
 }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)

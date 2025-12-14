@@ -100,6 +100,7 @@ export interface FinanceIncomeRecord {
   member_id?: string | null
   member_name?: string | null
   linked_asset_id?: string | null
+  linked_liability_id?: string | null
   reconciled_in_reconciliation?: string | null
   is_reconciled?: boolean | null
   account_id: string
@@ -119,6 +120,7 @@ export interface FinanceIncomeRecordInsert {
   member_id?: string | null
   member_name?: string | null
   linked_asset_id?: string | null
+  linked_liability_id?: string | null
   reconciled_in_reconciliation?: string | null
   is_reconciled?: boolean | null
   account_id: string
@@ -136,6 +138,7 @@ export interface FinanceIncomeRecordUpdate {
   member_id?: string | null
   member_name?: string | null
   linked_asset_id?: string | null
+  linked_liability_id?: string | null
   reconciled_in_reconciliation?: string | null
   is_reconciled?: boolean | null
   account_id?: string
@@ -204,6 +207,13 @@ export interface FinanceLiability {
   amount_paid: number
   balance: number
   status: "Not Paid" | "Partially Paid" | "Paid"
+  is_loan: boolean
+  linked_income_record_id: string | null
+  interest_rate: number | null
+  loan_start_date: string | null
+  loan_end_date: string | null
+  loan_duration_days: number | null
+  amount_received: number | null
   created_at: string
   updated_at: string
 }
@@ -219,6 +229,13 @@ export interface FinanceLiabilityInsert {
   amount_paid?: number
   balance?: number
   status?: "Not Paid" | "Partially Paid" | "Paid"
+  is_loan?: boolean
+  linked_income_record_id?: string | null
+  interest_rate?: number | null
+  loan_start_date?: string | null
+  loan_end_date?: string | null
+  loan_duration_days?: number | null
+  amount_received?: number | null
   created_at?: string
   updated_at?: string
 }
@@ -232,6 +249,13 @@ export interface FinanceLiabilityUpdate {
   amount_paid?: number
   balance?: number
   status?: "Not Paid" | "Partially Paid" | "Paid"
+  is_loan?: boolean
+  linked_income_record_id?: string | null
+  interest_rate?: number | null
+  loan_start_date?: string | null
+  loan_end_date?: string | null
+  loan_duration_days?: number | null
+  amount_received?: number | null
   updated_at?: string
 }
 

@@ -52,8 +52,8 @@ export function useCreateProjectCategory() {
         throw new Error("Organization not found")
       }
 
-      const { data, error } = await supabase
-        .from("project_categories")
+      const { data, error } = await (supabase
+        .from("project_categories") as any)
         .insert({
           ...categoryData,
           organization_id: organization.id,
@@ -95,8 +95,8 @@ export function useUpdateProjectCategory() {
         throw new Error("Organization not found")
       }
 
-      const { data, error } = await supabase
-        .from("project_categories")
+      const { data, error } = await (supabase
+        .from("project_categories") as any)
         .update({
           ...updateData,
           updated_at: new Date().toISOString(),

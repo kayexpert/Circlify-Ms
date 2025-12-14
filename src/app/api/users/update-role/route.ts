@@ -1,44 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { getUserSessionAndRole } from "@/lib/supabase/optimized-queries";
+import { verifySuperAdmin } from "@/lib/middleware/api-auth";
 
 const updateRoleSchema = z.object({
-  userId: z.string().uuid(),
-  role: z.enum(["super_admin", "admin", "member", "viewer"]),
+  userId: z.string().uuid("Invalid user ID format"),
+  role: z.enum(["super_admin", "admin", "member", "viewer"]).refine(
+    (val) => ["super_admin", "admin", "member", "viewer"].includes(val),
+    { message: "Role must be super_admin, admin, member, or viewer" }
+  ),
 });
 
 export async function PATCH(request: NextRequest) {
   try {
+    // Verify super admin access
+    const authResult = await verifySuperAdmin(request);
+    if (authResult.error || !authResult.auth) {
+      return authResult.error!;
+    }
+
+    const { organizationId } = authResult.auth;
     const supabase = await createClient();
 
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Parse request body
+    // Parse and validate request body
     const body = await request.json();
-    const validatedData = updateRoleSchema.parse(body);
+    const validatedData = updateRoleSchema.safeParse(body);
 
-    // Optimized: Get session and role in parallel using optimized query
-    const { session, role, organizationId } = await getUserSessionAndRole(user.id);
-
-    if (!session || !organizationId) {
+    if (!validatedData.success) {
       return NextResponse.json(
-        { error: "No active organization" },
+        { error: "Invalid request data", details: validatedData.error.issues },
         { status: 400 }
-      );
-    }
-
-    if (role !== "super_admin") {
-      return NextResponse.json(
-        { error: "Only super admins can update user roles" },
-        { status: 403 }
       );
     }
 
@@ -46,7 +37,7 @@ export async function PATCH(request: NextRequest) {
     const { data: targetUserOrg } = await supabase
       .from("organization_users")
       .select("role, organization_id")
-      .eq("user_id", validatedData.userId)
+      .eq("user_id", validatedData.data.userId)
       .single();
 
     if (!targetUserOrg) {
@@ -65,7 +56,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Prevent changing the last super admin
-    if (targetOrg.role === "super_admin" && validatedData.role !== "super_admin") {
+    if (targetOrg.role === "super_admin" && validatedData.data.role !== "super_admin") {
       const { data: superAdmins, error: countError } = await supabase
         .from("organization_users")
         .select("id")
@@ -93,8 +84,8 @@ export async function PATCH(request: NextRequest) {
     // Update the role
     const { error: updateError } = await supabase
       .from("organization_users")
-      .update({ role: validatedData.role, updated_at: new Date().toISOString() } as never)
-      .eq("user_id", validatedData.userId)
+      .update({ role: validatedData.data.role, updated_at: new Date().toISOString() } as never)
+      .eq("user_id", validatedData.data.userId)
       .eq("organization_id", organizationId);
 
     if (updateError) {

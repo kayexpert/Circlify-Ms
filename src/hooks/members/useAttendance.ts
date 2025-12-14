@@ -224,6 +224,43 @@ export function useDeleteAttendanceRecord() {
     mutationFn: async (recordId: string) => {
       if (!organization?.id) throw new Error("No organization selected")
 
+      // First, get the attendance record to get date and service_type
+      const { data: record, error: fetchError } = await supabase
+        .from("attendance_records")
+        .select("date, service_type")
+        .eq("id", recordId)
+        .eq("organization_id", organization.id)
+        .single()
+
+      if (fetchError) {
+        console.error("Error fetching attendance record:", fetchError)
+        throw fetchError
+      }
+
+      if (!record) {
+        throw new Error("Attendance record not found")
+      }
+
+      // Type assertion for the selected fields
+      const recordData = record as { date: string; service_type: string }
+
+      // Delete all associated member attendance records with matching date and service_type
+      const { data: deletedMemberRecords, error: deleteMemberError } = await supabase
+        .from("member_attendance_records")
+        .delete()
+        .eq("organization_id", organization.id)
+        .eq("date", recordData.date)
+        .eq("service_type", recordData.service_type)
+        .select()
+
+      if (deleteMemberError) {
+        console.error("Error deleting member attendance records:", deleteMemberError)
+        throw deleteMemberError
+      }
+
+      console.log(`Deleted ${deletedMemberRecords?.length || 0} member attendance records for date ${recordData.date} and service ${recordData.service_type}`)
+
+      // Now delete the attendance record itself
       const { error } = await supabase
         .from("attendance_records")
         .delete()
@@ -237,6 +274,16 @@ export function useDeleteAttendanceRecord() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance_records", organization?.id] })
+      // Invalidate and refetch all member attendance records since we deleted all associated records
+      queryClient.invalidateQueries({ 
+        queryKey: ["member_attendance_records", organization?.id],
+        refetchType: 'active' // Force refetch of active queries
+      })
+      // Also explicitly refetch all member attendance queries to ensure immediate update
+      queryClient.refetchQueries({ 
+        queryKey: ["member_attendance_records", organization?.id],
+        type: 'active'
+      })
       toast.success("Attendance record deleted successfully")
     },
     onError: (error: Error) => {

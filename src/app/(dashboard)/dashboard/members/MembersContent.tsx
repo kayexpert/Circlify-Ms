@@ -16,14 +16,17 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Mail, Printer, User as UserIcon, Calendar, Upload, Trash2, X, ChevronDown, UserCheck, CheckCircle2, XCircle, Plus as PlusIcon, Download, Loader2 } from "lucide-react"
+import { Search, Mail, Printer, User as UserIcon, Calendar, Upload, Trash2, X, ChevronDown, UserCheck, CheckCircle2, XCircle, Plus as PlusIcon, Download, Loader2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { Loader, Spinner } from "@/components/ui/loader"
 import Image from "next/image"
 import { formatDate, formatRecordDate, formatCurrency } from "./utils"
-import { useMembersPaginated, useCreateMember, useUpdateMember, useDeleteMember } from "@/hooks/members"
+import { useMembersPaginated, useCreateMember, useUpdateMember, useDeleteMember, useMember } from "@/hooks/members"
 import { useGroups } from "@/hooks/members"
 import { useDepartments } from "@/hooks/members"
 import { useRolesPositions } from "@/hooks/members"
+import { convertMember } from "@/lib/utils/type-converters"
+import { createClient } from "@/lib/supabase/client"
 import { useMemberAttendanceRecords, useDeleteMemberAttendanceRecord } from "@/hooks/members"
 import { useMemberFollowUps, useCreateMemberFollowUp, useUpdateMemberFollowUp, useDeleteMemberFollowUp } from "@/hooks/members"
 import { useIncomeRecords } from "@/hooks/finance/useIncomeRecords"
@@ -42,14 +45,22 @@ type MembersModuleMember = Member
 // Optimized for large lists with better memoization
 const MemberCard = React.memo(({ 
   member, 
-  onClick 
+  onClick,
+  onHover
 }: { 
   member: Member
-  onClick: (member: Member) => void 
+  onClick: (member: Member) => void
+  onHover?: (memberId: string) => void
 }) => {
   const handleClick = useCallback(() => {
     onClick(member)
   }, [member, onClick])
+
+  const handleMouseEnter = useCallback(() => {
+    if (onHover && member.uuid) {
+      onHover(member.uuid)
+    }
+  }, [onHover, member.uuid])
 
   const phoneNumbers = useMemo(() => {
     return [member.phone_number, member.secondary_phone]
@@ -61,14 +72,21 @@ const MemberCard = React.memo(({
     return `${member.first_name?.[0] || ''}${member.last_name?.[0] || ''}`
   }, [member.first_name, member.last_name])
 
+  const badgeClassName = useMemo(() => {
+    return member.membership_status === "active" 
+      ? "bg-green-500 hover:bg-green-600" 
+      : "bg-red-500 hover:bg-red-600"
+  }, [member.membership_status])
+
   return (
     <Card 
       className="relative overflow-hidden border-0 border-l-0 border-r-0 border-b-0 border-t-4 cursor-pointer shadow-sm hover:shadow-lg transition-shadow"
       style={{ borderTopColor: '#14b8a6' } as React.CSSProperties}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
     >
       <div className="relative w-full aspect-square bg-muted flex items-center justify-center">
-        {member.photo ? (
+        {member.photo && !member.photo.startsWith('data:') ? (
           <Image 
             src={member.photo} 
             alt={`${member.first_name} ${member.last_name}`} 
@@ -91,11 +109,7 @@ const MemberCard = React.memo(({
       </div>
       {member.membership_status && (
         <Badge 
-          className={`absolute top-2 right-2 text-white text-xs rounded-sm ${
-            member.membership_status === "active" 
-              ? "bg-green-500 hover:bg-green-600" 
-              : "bg-red-500 hover:bg-red-600"
-          }`}
+          className={`absolute top-2 right-2 text-white text-xs rounded-sm ${badgeClassName}`}
         >
           {member.membership_status}
         </Badge>
@@ -112,39 +126,45 @@ const MemberCard = React.memo(({
     prevProps.member.photo === nextProps.member.photo &&
     prevProps.member.membership_status === nextProps.member.membership_status &&
     prevProps.member.phone_number === nextProps.member.phone_number &&
-    prevProps.member.secondary_phone === nextProps.member.secondary_phone
+    prevProps.member.secondary_phone === nextProps.member.secondary_phone &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.onHover === nextProps.onHover
   )
 })
 MemberCard.displayName = "MemberCard"
 
-// Multi-select component for groups/departments
-function MultiSelect({
+// Multi-select component for groups/departments - memoized for performance
+const MultiSelect = React.memo(function MultiSelect({
   options,
   selected,
   onSelectionChange,
   placeholder,
   label,
+  setupLink,
+  setupMessage,
 }: {
   options: { value: string; label: string }[]
   selected: string[]
   onSelectionChange: (selected: string[]) => void
   placeholder: string
   label: string
+  setupLink?: string
+  setupMessage?: string
 }) {
   const [open, setOpen] = useState(false)
 
-  const toggleOption = (value: string) => {
+  const toggleOption = useCallback((value: string) => {
     if (selected.includes(value)) {
       onSelectionChange(selected.filter((v) => v !== value))
     } else {
       onSelectionChange([...selected, value])
     }
-  }
+  }, [selected, onSelectionChange])
 
-  const removeOption = (value: string, e: React.MouseEvent) => {
+  const removeOption = useCallback((value: string, e: React.MouseEvent) => {
     e.stopPropagation()
     onSelectionChange(selected.filter((v) => v !== value))
-  }
+  }, [selected, onSelectionChange])
 
   return (
     <div className="space-y-2">
@@ -157,10 +177,15 @@ function MultiSelect({
             aria-expanded={open}
             className="w-full justify-between min-h-10 h-auto py-2 px-3"
             type="button"
+            disabled={options.length === 0 && !setupLink}
           >
             <div className="flex flex-wrap gap-1 flex-1 mr-2">
               {selected.length === 0 ? (
-                <span className="text-muted-foreground">{placeholder}</span>
+                options.length === 0 && setupLink ? (
+                  <span className="text-muted-foreground italic">No {label.toLowerCase()} available</span>
+                ) : (
+                  <span className="text-muted-foreground">{placeholder}</span>
+                )
               ) : (
                 selected.map((value) => {
                   const option = options.find((opt) => opt.value === value)
@@ -199,8 +224,20 @@ function MultiSelect({
           <ScrollArea className="h-[200px]">
             <div className="p-2">
               {options.length === 0 ? (
-                <div className="py-6 text-center text-sm text-muted-foreground">
-                  No options available
+                <div className="py-6 px-4 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {setupMessage || `No ${label.toLowerCase()} available`}
+                  </p>
+                  {setupLink && (
+                    <Link 
+                      href={setupLink}
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                    >
+                      <span>Click here to add {label.toLowerCase()}</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  )}
                 </div>
               ) : (
                 options.map((option) => (
@@ -225,7 +262,24 @@ function MultiSelect({
       </Popover>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if options, selected, or callbacks change
+  return (
+    prevProps.options.length === nextProps.options.length &&
+    prevProps.options.every((opt, idx) => 
+      opt.value === nextProps.options[idx]?.value && 
+      opt.label === nextProps.options[idx]?.label
+    ) &&
+    prevProps.selected.length === nextProps.selected.length &&
+    prevProps.selected.every(val => nextProps.selected.includes(val)) &&
+    prevProps.onSelectionChange === nextProps.onSelectionChange &&
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.label === nextProps.label &&
+    prevProps.setupLink === nextProps.setupLink &&
+    prevProps.setupMessage === nextProps.setupMessage
+  )
+})
+MultiSelect.displayName = "MultiSelect"
 
 // Country options
 const countryOptions = [
@@ -263,6 +317,116 @@ export default function MembersContent() {
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
   const deleteMember = useDeleteMember()
+
+  // Prefetch full member data on hover for instant loading when drawer opens
+  // Throttled to prevent excessive prefetching
+  const handleMemberHover = useCallback((memberId: string) => {
+    if (!organization?.id || !memberId) return
+    
+    // Check if already cached to avoid unnecessary prefetch
+    const cached = queryClient.getQueryData(["members", organization.id, memberId])
+    if (cached) return
+    
+    // Prefetch full member data when hovering over a card
+    // This makes the drawer open instantly with all data already cached
+    queryClient.prefetchQuery({
+      queryKey: ["members", organization.id, memberId],
+      queryFn: async () => {
+        try {
+          const supabase = createClient()
+          const { data, error } = await (supabase
+            .from("members") as any)
+            .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles, created_at, updated_at")
+            .eq("id", memberId)
+            .eq("organization_id", organization.id)
+            .single()
+
+          if (error) {
+            // Log detailed error information with defensive property access
+            const errorInfo: Record<string, unknown> = {
+              memberId,
+              organizationId: organization.id,
+            }
+            
+            // Safely extract error properties
+            let hasErrorProperties = false
+            if (error && typeof error === 'object' && error !== null) {
+              // Check if error object has any enumerable properties
+              const errorKeys = Object.keys(error)
+              if (errorKeys.length === 0) {
+                // Empty error object - likely a false positive or network issue
+                errorInfo.message = "Empty error object returned from database query"
+                hasErrorProperties = true
+              } else {
+                // Extract known error properties
+                if ('message' in error && error.message) {
+                  errorInfo.message = error.message
+                  hasErrorProperties = true
+                }
+                if ('code' in error && error.code) {
+                  errorInfo.code = error.code
+                  hasErrorProperties = true
+                }
+                if ('details' in error && error.details) {
+                  errorInfo.details = error.details
+                  hasErrorProperties = true
+                }
+                if ('hint' in error && error.hint) {
+                  errorInfo.hint = error.hint
+                  hasErrorProperties = true
+                }
+                // If error object has no useful properties, stringify it
+                if (!hasErrorProperties && errorKeys.length > 0) {
+                  try {
+                    const errorString = JSON.stringify(error)
+                    // Only add if it's not just an empty object
+                    if (errorString !== '{}') {
+                      errorInfo.errorString = errorString
+                      hasErrorProperties = true
+                    }
+                  } catch {
+                    errorInfo.errorString = String(error)
+                    hasErrorProperties = true
+                  }
+                }
+              }
+            } else if (error) {
+              // Non-object error (string, number, etc.)
+              errorInfo.error = String(error)
+              hasErrorProperties = true
+            }
+            
+            // Only log if we have meaningful error information
+            if (hasErrorProperties) {
+              console.error("Error prefetching member:", errorInfo)
+            } else {
+              // Silent fail for empty/unclear errors to avoid console spam
+              // This can happen with network issues or race conditions
+            }
+            // Return null to prevent query failure, but don't cache the error
+            return null
+          }
+
+          return data ? convertMember(data) : null
+        } catch (err) {
+          // Handle unexpected errors
+          console.error("Unexpected error prefetching member:", {
+            error: err instanceof Error ? err.message : String(err),
+            memberId,
+            organizationId: organization.id,
+          })
+          return null
+        }
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    }).catch((err) => {
+      // Silently handle prefetch errors to prevent console noise
+      // The error is already logged in the queryFn above
+      if (process.env.NODE_ENV === 'development') {
+        console.debug("Prefetch query failed (non-critical):", err)
+      }
+    })
+  }, [organization?.id, queryClient])
 
   const isLoading = membersLoading || groupsLoading || departmentsLoading
 
@@ -317,6 +481,7 @@ export default function MembersContent() {
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [activeTab, setActiveTab] = useState("bio")
   
   // Follow-up form state
@@ -337,37 +502,49 @@ export default function MembersContent() {
 
   // Sync selectedMember when allMembers updates (e.g., after a successful update)
   // This ensures that when the query refetches, we update the selectedMember with the latest data
+  // Optimized to only run when necessary
   useEffect(() => {
-    if (selectedMember && allMembers.length > 0) {
-      const refreshedMember = allMembers.find(m => m.id === selectedMember.id)
-      if (refreshedMember) {
-        // Check if groups, departments, or roles have changed
-        const currentGroups = (selectedMember as any).groups || []
-        const currentDepartments = (selectedMember as any).departments || []
-        const currentRoles = (selectedMember as any).roles || []
-        const newGroups = (refreshedMember as any).groups || []
-        const newDepartments = (refreshedMember as any).departments || []
-        const newRoles = (refreshedMember as any).roles || []
-        
-        const groupsChanged = JSON.stringify(newGroups) !== JSON.stringify(currentGroups)
-        const departmentsChanged = JSON.stringify(newDepartments) !== JSON.stringify(currentDepartments)
-        const rolesChanged = JSON.stringify(newRoles) !== JSON.stringify(currentRoles)
-        
-        // Always update if there are changes, or if we're syncing after a refetch
-        if (groupsChanged || departmentsChanged || rolesChanged) {
-          // Update selectedMember with fresh data
-          setSelectedMember(refreshedMember as Member)
-          // Update form data to match
-          setFormData(prev => ({
-            ...prev,
-            groups: newGroups,
-            departments: newDepartments,
-            roles: newRoles,
-          }))
-        }
+    if (!selectedMember || !selectedMemberUUID || allMembers.length === 0 || !isSheetOpen) {
+      return
+    }
+    
+    const refreshedMember = allMembers.find(m => m.uuid === selectedMemberUUID)
+    if (!refreshedMember) return
+    
+    // Check if any fields have changed by comparing key fields
+    // Use shallow comparison for arrays to avoid expensive JSON.stringify
+    const groupsChanged = (refreshedMember as any).groups?.length !== (selectedMember as any).groups?.length ||
+      (refreshedMember as any).groups?.some((g: string, i: number) => g !== (selectedMember as any).groups?.[i])
+    const departmentsChanged = (refreshedMember as any).departments?.length !== (selectedMember as any).departments?.length ||
+      (refreshedMember as any).departments?.some((d: string, i: number) => d !== (selectedMember as any).departments?.[i])
+    const rolesChanged = (refreshedMember as any).roles?.length !== (selectedMember as any).roles?.length ||
+      (refreshedMember as any).roles?.some((r: string, i: number) => r !== (selectedMember as any).roles?.[i])
+    
+    const hasChanges = 
+      refreshedMember.first_name !== selectedMember.first_name ||
+      refreshedMember.last_name !== selectedMember.last_name ||
+      refreshedMember.photo !== selectedMember.photo ||
+      groupsChanged ||
+      departmentsChanged ||
+      rolesChanged
+    
+    if (hasChanges) {
+      // Update selectedMember with fresh data
+      setSelectedMember(refreshedMember as Member)
+      // Update form data to match (only if drawer is open)
+      setFormData(prev => ({
+        ...prev,
+        first_name: refreshedMember.first_name || prev.first_name,
+        last_name: refreshedMember.last_name || prev.last_name,
+        groups: (refreshedMember as any).groups || prev.groups,
+        departments: (refreshedMember as any).departments || prev.departments,
+        roles: (refreshedMember as any).roles || prev.roles,
+      }))
+      if (refreshedMember.photo) {
+        setPhotoPreview(refreshedMember.photo)
       }
     }
-  }, [allMembers]) // Re-run whenever allMembers changes (after refetch)
+  }, [allMembers, selectedMember, selectedMemberUUID, isSheetOpen]) // Re-run whenever allMembers changes (after refetch)
 
   // Income records - only load when payment tab is active to improve initial load time
   const shouldLoadIncomeRecords = activeTab === "payments" && selectedMember !== null
@@ -394,14 +571,30 @@ export default function MembersContent() {
   // No need for separate database lookup - use member.uuid directly
 
   // Filter members based on search and status - using debounced search
+  // Optimized with early returns and memoized search query
+  const searchQueryLower = useMemo(() => debouncedSearchQuery.toLowerCase(), [debouncedSearchQuery])
   const filteredMembers = useMemo((): Member[] => {
+    if (!searchQueryLower && filterStatus === "all") {
+      return allMembers // Early return for no filters
+    }
+    
     return allMembers.filter((member): member is Member => {
-      const searchText = `${member.first_name} ${member.last_name} ${member.email} ${member.phone_number}`.toLowerCase()
-      const matchesSearch = searchText.includes(debouncedSearchQuery.toLowerCase())
-      const matchesStatus = filterStatus === "all" || member.membership_status === filterStatus
-      return matchesSearch && matchesStatus
+      // Only compute search text if needed
+      if (searchQueryLower) {
+        const searchText = `${member.first_name} ${member.last_name} ${member.email || ''} ${member.phone_number || ''}`.toLowerCase()
+        if (!searchText.includes(searchQueryLower)) {
+          return false
+        }
+      }
+      
+      // Status filter
+      if (filterStatus !== "all" && member.membership_status !== filterStatus) {
+        return false
+      }
+      
+      return true
     })
-  }, [allMembers, debouncedSearchQuery, filterStatus])
+  }, [allMembers, searchQueryLower, filterStatus])
 
   // Prepare groups and departments options for multi-select
   const groupOptions = useMemo(() => {
@@ -418,29 +611,31 @@ export default function MembersContent() {
 
   // Calculate member contributions for payment history
   // Only compute when payments tab is active to improve performance
+  // Memoize member name to avoid recalculating
+  const memberFullNameLower = useMemo(() => {
+    if (!selectedMember) return ""
+    return `${selectedMember.first_name} ${selectedMember.last_name}`.toLowerCase().trim()
+  }, [selectedMember?.first_name, selectedMember?.last_name])
+  
   const memberContributions = useMemo(() => {
-    if (!selectedMember || activeTab !== "payments") return []
+    if (!selectedMember || activeTab !== "payments" || incomeRecords.length === 0) return []
     
-    const memberFullName = `${selectedMember.first_name} ${selectedMember.last_name}`
-    const memberFullNameLower = memberFullName.toLowerCase().trim()
+    const memberId = selectedMember.id
     
     return incomeRecords.filter((record) => {
-      // Primary match: by memberId (if both exist and match)
-      if (record.memberId && selectedMember.id) {
-        if (record.memberId === selectedMember.id) {
-          return true
-        }
+      // Primary match: by memberId (if both exist and match) - fastest check
+      if (record.memberId && memberId && record.memberId === memberId) {
+        return true
       }
       
       // Secondary match: by member name (case-insensitive, with multiple formats)
-      if (record.memberName) {
+      if (record.memberName && memberFullNameLower) {
         const recordMemberNameLower = record.memberName.toLowerCase().trim()
-        // Exact match
+        // Exact match first (most common)
         if (recordMemberNameLower === memberFullNameLower) {
           return true
         }
-        // Also check if the record member name contains the selected member's name
-        // This handles cases where there might be extra spaces or formatting differences
+        // Partial match (handles extra spaces or formatting differences)
         if (recordMemberNameLower.includes(memberFullNameLower) || memberFullNameLower.includes(recordMemberNameLower)) {
           return true
         }
@@ -448,7 +643,7 @@ export default function MembersContent() {
       
       return false
     })
-  }, [incomeRecords, selectedMember, activeTab])
+  }, [incomeRecords, selectedMember, activeTab, memberFullNameLower])
 
   // Calculate contribution stats - only when payments tab is active
   const contributionStats = useMemo(() => {
@@ -503,82 +698,95 @@ export default function MembersContent() {
     setActiveTab("bio")
   }
 
-  const handleMemberClick = useCallback((member: Member) => {
-    // Open drawer IMMEDIATELY to show animation
+  const handleMemberClick = useCallback(async (member: Member) => {
+    // Open drawer IMMEDIATELY for instant feedback
     setIsSheetOpen(true)
     
-    // Set basic member data immediately for instant display
+    // Set basic member data immediately
     setSelectedMember(member)
     setSelectedMemberUUID(member.uuid || null)
     setActiveTab("bio")
     
-    // Use startTransition for non-urgent updates to prevent blocking
+    // Try to get prefetched full member data from cache first
+    // If not available, use the member object from list (may have limited fields)
+    let fullMember: Member | null = null
+    if (member.uuid && organization?.id) {
+      const cachedData = queryClient.getQueryData<Member>(["members", organization.id, member.uuid])
+      if (cachedData) {
+        fullMember = cachedData
+      } else {
+        // If not cached, fetch it quickly in background
+        // Don't await - let it populate cache for next time
+        const supabase = createClient()
+        ;(async () => {
+          try {
+            const { data, error } = await (supabase
+              .from("members") as any)
+              .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles, created_at, updated_at")
+              .eq("id", member.uuid)
+              .eq("organization_id", organization.id)
+              .single()
+
+            if (!error && data) {
+              fullMember = convertMember(data)
+              // Cache it for future use
+              queryClient.setQueryData(["members", organization.id, member.uuid], fullMember)
+              // Update selectedMember if drawer is still open
+              if (isSheetOpen) {
+                setSelectedMember(fullMember)
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching full member data:", error)
+          }
+        })()
+      }
+    }
+    
+    // Use full member data if available, otherwise fall back to list member data
+    const memberToUse = fullMember || member
+    
+    // Set form data with all available fields
+    const joinDateObj = memberToUse.join_date ? new Date(memberToUse.join_date + "T00:00:00") : undefined
+    const dobObj = memberToUse.date_of_birth ? new Date(memberToUse.date_of_birth + "T00:00:00") : undefined
+    
     startTransition(() => {
-      // Set form data in a non-blocking way
-      const joinDateObj = member.join_date ? new Date(member.join_date + "T00:00:00") : undefined
-      const dobObj = member.date_of_birth ? new Date(member.date_of_birth + "T00:00:00") : undefined
-      
       setFormData({
-        first_name: member.first_name || "",
-        last_name: member.last_name || "",
-        middle_name: member.middle_name || "",
-        email: member.email || "",
-        phone_number: member.phone_number || "",
-        secondary_phone: member.secondary_phone || "",
-        gender: member.gender || "",
-        date_of_birth: member.date_of_birth || "",
-        marital_status: member.marital_status || "",
-        spouse_name: member.spouse_name || "",
-        number_of_children: member.number_of_children?.toString() || "",
-        occupation: member.occupation || "",
-        address: member.address || "",
-        city: member.city || "",
-        town: member.town || "",
-        region: member.region || "",
-        digital_address: member.digital_address || "",
-        join_date: member.join_date || "",
-        membership_status: member.membership_status || "active",
-        groups: member.groups || [],
-        departments: member.departments || [],
-        roles: member.roles || [],
-        notes: member.notes || "",
+        first_name: memberToUse.first_name || "",
+        last_name: memberToUse.last_name || "",
+        middle_name: memberToUse.middle_name || "",
+        email: memberToUse.email || "",
+        phone_number: memberToUse.phone_number || "",
+        secondary_phone: memberToUse.secondary_phone || "",
+        gender: memberToUse.gender || "",
+        date_of_birth: memberToUse.date_of_birth || "",
+        marital_status: memberToUse.marital_status || "",
+        spouse_name: memberToUse.spouse_name || "",
+        number_of_children: memberToUse.number_of_children?.toString() || "",
+        occupation: memberToUse.occupation || "",
+        address: memberToUse.address || "",
+        city: memberToUse.city || "",
+        town: memberToUse.town || "",
+        region: memberToUse.region || "",
+        digital_address: memberToUse.digital_address || "",
+        join_date: memberToUse.join_date || "",
+        membership_status: memberToUse.membership_status || "active",
+        groups: memberToUse.groups || [],
+        departments: memberToUse.departments || [],
+        roles: memberToUse.roles || [],
+        notes: memberToUse.notes || "",
       })
       setDateOfBirth(dobObj && !isNaN(dobObj.getTime()) ? dobObj : undefined)
       setJoinDate(joinDateObj && !isNaN(joinDateObj.getTime()) ? joinDateObj : undefined)
+      setPhotoPreview(memberToUse.photo || null)
       setFormErrors({})
-      setPhotoPreview(member.photo || null)
-    })
-    
-    // Refetch in background (non-blocking) to get latest data
-    queryClient.refetchQueries({ queryKey: ["members", organization?.id] }).then(() => {
-      // Update with fresh data after refetch completes
-      const freshMembers = queryClient.getQueryData<Member[]>(["members", organization?.id]) || allMembers
-      const foundMember = freshMembers.find(m => m.id === member.id)
-      if (foundMember) {
-        startTransition(() => {
-          setSelectedMember(foundMember as Member)
-          // Only update if there are actual changes
-          const joinDateObj = foundMember.join_date ? new Date(foundMember.join_date + "T00:00:00") : undefined
-          const dobObj = foundMember.date_of_birth ? new Date(foundMember.date_of_birth + "T00:00:00") : undefined
-          
-          setFormData(prev => ({
-            ...prev,
-            first_name: foundMember.first_name || prev.first_name,
-            last_name: foundMember.last_name || prev.last_name,
-            middle_name: foundMember.middle_name || prev.middle_name,
-            email: foundMember.email || prev.email,
-            phone_number: foundMember.phone_number || prev.phone_number,
-            secondary_phone: foundMember.secondary_phone || prev.secondary_phone,
-            groups: foundMember.groups || prev.groups,
-            departments: foundMember.departments || prev.departments,
-          }))
-          setDateOfBirth(dobObj && !isNaN(dobObj.getTime()) ? dobObj : undefined)
-          setJoinDate(joinDateObj && !isNaN(joinDateObj.getTime()) ? joinDateObj : undefined)
-          setPhotoPreview(foundMember.photo || null)
-        })
+      
+      // Update selectedMember with full data if we fetched it
+      if (fullMember) {
+        setSelectedMember(fullMember)
       }
     })
-  }, [allMembers, organization?.id, queryClient])
+  }, [organization?.id, queryClient, isSheetOpen])
 
   const handleAddMember = () => {
     resetForm()
@@ -589,9 +797,14 @@ export default function MembersContent() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!organization?.id) {
+      toast.error('Organization not found')
+      return
+    }
+
     // Validate file
-    const { validateImageFile } = await import('@/lib/utils/image-compression')
-    const validation = validateImageFile(file, 5) // Max 5MB before compression
+    const { validateImageFile, PROFILE_PHOTO_OPTIONS } = await import('@/lib/utils/image-compression')
+    const validation = validateImageFile(file, 10) // Max 10MB before compression
     
     if (!validation.isValid) {
       toast.error(validation.error || 'Invalid image file')
@@ -603,34 +816,64 @@ export default function MembersContent() {
     }
 
     try {
-      // Compress image before preview
+      setIsUploadingPhoto(true)
+      
+      // Delete old photo if it exists (when updating existing member)
+      const oldPhotoUrl = selectedMember?.photo || photoPreview
+      if (oldPhotoUrl && typeof oldPhotoUrl === 'string' && !oldPhotoUrl.startsWith('data:')) {
+        try {
+          await fetch('/api/members/delete-photo', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoUrl: oldPhotoUrl }),
+          })
+        } catch (deleteError) {
+          // Log but don't fail if old photo deletion fails
+          console.error('Error deleting old photo:', deleteError)
+        }
+      }
+      
+      // Compress image aggressively for profile photos
       const { compressImage } = await import('@/lib/utils/image-compression')
-      const compressedFile = await compressImage(file, {
-        maxSizeMB: 0.5, // Compress to max 500KB
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
+      const compressedFile = await compressImage(file, PROFILE_PHOTO_OPTIONS)
+      
+      // Upload compressed file to Supabase Storage
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', compressedFile)
+      uploadFormData.append('organizationId', organization.id)
+
+      const uploadResponse = await fetch('/api/members/upload-photo', {
+        method: 'POST',
+        body: uploadFormData,
       })
 
-      // Show preview of compressed image
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+      const uploadResult = await uploadResponse.json()
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadResult.error || 'Failed to upload photo')
       }
-      reader.readAsDataURL(compressedFile)
+
+      // Store the storage URL in photoPreview
+      setPhotoPreview(uploadResult.url)
       
       // Show compression info
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2)
-      const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2)
-      if (file.size > compressedFile.size) {
-        toast.success(`Image compressed from ${originalSizeMB}MB to ${compressedSizeMB}MB`)
-      }
+      const compressedSizeKB = (compressedFile.size / 1024).toFixed(2)
+      const compressionRatio = parseFloat(uploadResult.compressionRatio?.replace('%', '') || '0')
+      const compressionMessage = compressionRatio > 0.1 
+        ? `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB (${uploadResult.compressionRatio} reduction)`
+        : `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB`
+      toast.success(compressionMessage)
     } catch (error: any) {
-      console.error('Error compressing image:', error)
+      console.error('Error processing image:', error)
       toast.error(error.message || 'Failed to process image. Please try again.')
+      setPhotoPreview(null)
       // Reset file input
       if (e.target) {
         e.target.value = ''
       }
+    } finally {
+      setIsUploadingPhoto(false)
     }
   }
 
@@ -678,31 +921,47 @@ export default function MembersContent() {
     }
 
     try {
+      // Helper function to convert empty strings to null (for database storage)
+      // This ensures all fields are included in the update, even if empty
+      // Returns undefined instead of null to match Member type definition
+      const toNullIfEmpty = (value: string | undefined): string | undefined => {
+        if (!value || value.trim() === "") return undefined
+        return value.trim()
+      }
+
+      // Helper function for number fields
+      const toNullIfEmptyNumber = (value: string | undefined): number | undefined => {
+        if (!value || value.trim() === "") return undefined
+        const num = parseInt(value)
+        return isNaN(num) ? undefined : num
+      }
+
       const memberData: Omit<Member, "id" | "uuid"> = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email || "",
         phone_number: formData.phone_number,
-        secondary_phone: formData.secondary_phone || undefined,
-        photo: photoPreview || undefined, // photoPreview already contains the compressed image as base64
+        // Always include all fields, converting empty strings to undefined
+        secondary_phone: toNullIfEmpty(formData.secondary_phone),
+        photo: photoPreview || undefined, // photoPreview now contains the Supabase Storage URL
         membership_status: formData.membership_status as "active" | "inactive" | "visitor",
-        join_date: formData.join_date || undefined,
-        city: formData.city || undefined,
-        region: formData.region || undefined,
-        middle_name: formData.middle_name || undefined,
-        gender: formData.gender || undefined,
-        date_of_birth: formData.date_of_birth || undefined,
-        marital_status: formData.marital_status || undefined,
-        spouse_name: formData.spouse_name || undefined,
-        number_of_children: formData.number_of_children ? parseInt(formData.number_of_children) : undefined,
-        occupation: formData.occupation || undefined,
-        address: formData.address || undefined,
-        town: formData.town || undefined,
-        digital_address: formData.digital_address || undefined,
+        join_date: toNullIfEmpty(formData.join_date),
+        city: toNullIfEmpty(formData.city),
+        region: toNullIfEmpty(formData.region),
+        middle_name: toNullIfEmpty(formData.middle_name),
+        gender: toNullIfEmpty(formData.gender),
+        date_of_birth: toNullIfEmpty(formData.date_of_birth),
+        marital_status: toNullIfEmpty(formData.marital_status),
+        spouse_name: toNullIfEmpty(formData.spouse_name),
+        number_of_children: toNullIfEmptyNumber(formData.number_of_children),
+        occupation: toNullIfEmpty(formData.occupation),
+        address: toNullIfEmpty(formData.address),
+        town: toNullIfEmpty(formData.town),
+        digital_address: toNullIfEmpty(formData.digital_address),
         groups: formData.groups || [],
         departments: formData.departments || [],
         roles: formData.roles || [],
-        notes: formData.notes || undefined,
+        notes: toNullIfEmpty(formData.notes),
       }
 
       if (selectedMember && selectedMemberUUID) {
@@ -716,19 +975,62 @@ export default function MembersContent() {
         // This ensures the UI updates right away without waiting for refetch
         if (updatedMember) {
           const updatedMemberTyped = updatedMember as Member
+          
+          // Update React Query cache for both paginated and individual member queries
+          if (organization?.id) {
+            queryClient.setQueryData(["members", organization.id, selectedMemberUUID], updatedMemberTyped)
+            
+            // Also update the paginated list cache if this member is in the current page
+            queryClient.setQueryData(
+              ["members", "paginated", organization.id, currentPage, pageSize],
+              (oldData: any) => {
+                if (!oldData?.data) return oldData
+                return {
+                  ...oldData,
+                  data: oldData.data.map((m: Member) => 
+                    m.uuid === selectedMemberUUID ? updatedMemberTyped : m
+                  ),
+                }
+              }
+            )
+          }
+          
           setSelectedMember(updatedMemberTyped)
           
-          // Update form data with the latest groups, departments, and roles
-          const updatedGroups = (updatedMemberTyped as any).groups || []
-          const updatedDepartments = (updatedMemberTyped as any).departments || []
-          const updatedRoles = (updatedMemberTyped as any).roles || []
+          // Update form data with all latest data to ensure consistency
+          const joinDateObj = updatedMemberTyped.join_date ? new Date(updatedMemberTyped.join_date + "T00:00:00") : undefined
+          const dobObj = updatedMemberTyped.date_of_birth ? new Date(updatedMemberTyped.date_of_birth + "T00:00:00") : undefined
           
-          setFormData(prev => ({
-            ...prev,
-            groups: updatedGroups,
-            departments: updatedDepartments,
-            roles: updatedRoles,
-          }))
+          setFormData({
+            first_name: updatedMemberTyped.first_name || "",
+            last_name: updatedMemberTyped.last_name || "",
+            middle_name: updatedMemberTyped.middle_name || "",
+            email: updatedMemberTyped.email || "",
+            phone_number: updatedMemberTyped.phone_number || "",
+            secondary_phone: updatedMemberTyped.secondary_phone || "",
+            gender: updatedMemberTyped.gender || "",
+            date_of_birth: updatedMemberTyped.date_of_birth || "",
+            marital_status: updatedMemberTyped.marital_status || "",
+            spouse_name: updatedMemberTyped.spouse_name || "",
+            number_of_children: updatedMemberTyped.number_of_children?.toString() || "",
+            occupation: updatedMemberTyped.occupation || "",
+            address: updatedMemberTyped.address || "",
+            city: updatedMemberTyped.city || "",
+            town: updatedMemberTyped.town || "",
+            region: updatedMemberTyped.region || "",
+            digital_address: updatedMemberTyped.digital_address || "",
+            join_date: updatedMemberTyped.join_date || "",
+            membership_status: updatedMemberTyped.membership_status || "active",
+            groups: (updatedMemberTyped as any).groups || [],
+            departments: (updatedMemberTyped as any).departments || [],
+            roles: (updatedMemberTyped as any).roles || [],
+            notes: updatedMemberTyped.notes || "",
+          })
+          setDateOfBirth(dobObj && !isNaN(dobObj.getTime()) ? dobObj : undefined)
+          setJoinDate(joinDateObj && !isNaN(joinDateObj.getTime()) ? joinDateObj : undefined)
+          if (updatedMemberTyped.photo) {
+            setPhotoPreview(updatedMemberTyped.photo)
+          }
         }
       } else {
         // Create new member
@@ -815,6 +1117,7 @@ export default function MembersContent() {
               key={member.id}
               member={member}
               onClick={handleMemberClick}
+              onHover={handleMemberHover}
             />
           ))
         )}
@@ -859,7 +1162,11 @@ export default function MembersContent() {
                     className="w-36 h-36 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group" 
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    {(photoPreview || selectedMember?.photo) ? (
+                    {isUploadingPhoto ? (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (photoPreview || (selectedMember?.photo && !selectedMember.photo.startsWith('data:'))) ? (
                       <Image 
                         src={photoPreview || selectedMember?.photo || ''} 
                         alt={selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Profile'} 
@@ -872,9 +1179,11 @@ export default function MembersContent() {
                         {formData.first_name?.[0] || ''}{formData.last_name?.[0] || ''}
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Upload className="h-8 w-8 text-white" />
-                    </div>
+                    {!isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload className="h-8 w-8 text-white" />
+                      </div>
+                    )}
                   </div>
                   <input 
                     ref={fileInputRef} 
@@ -1262,6 +1571,8 @@ export default function MembersContent() {
                             onSelectionChange={(selected) => setFormData({ ...formData, groups: selected })}
                             placeholder="Select Groups"
                             label="Group"
+                            setupLink="/dashboard/members?tab=groups-departments"
+                            setupMessage="No groups available. Create groups to organize your members."
                           />
                           <MultiSelect
                             options={departmentOptions}
@@ -1269,6 +1580,8 @@ export default function MembersContent() {
                             onSelectionChange={(selected) => setFormData({ ...formData, departments: selected })}
                             placeholder="Select Departments"
                             label="Department"
+                            setupLink="/dashboard/members?tab=groups-departments"
+                            setupMessage="No departments available. Create departments to organize your members."
                           />
                         </div>
 
@@ -1280,6 +1593,8 @@ export default function MembersContent() {
                             onSelectionChange={(selected) => setFormData({ ...formData, roles: selected })}
                             placeholder="Select Roles/Positions"
                             label="Roles/Positions"
+                            setupLink="/dashboard/members?tab=groups-departments"
+                            setupMessage="No roles/positions available. Create roles and positions to assign to members."
                           />
                         </div>
 
@@ -1436,8 +1751,17 @@ export default function MembersContent() {
                                       <TableCell>{record.service_type}</TableCell>
                                       <TableCell>
                                         <div className="flex items-center gap-2">
-                                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                          <span className="text-sm font-medium text-green-600">Present</span>
+                                          {record.status === 'absent' ? (
+                                            <>
+                                              <XCircle className="h-4 w-4 text-red-600" />
+                                              <span className="text-sm font-medium text-red-600">Absent</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                              <span className="text-sm font-medium text-green-600">Present</span>
+                                            </>
+                                          )}
                                         </div>
                                       </TableCell>
                                     </TableRow>
@@ -1468,13 +1792,12 @@ export default function MembersContent() {
                                     <TableHead className="w-[100px]">Date</TableHead>
                                     <TableHead className="w-[110px]">Method</TableHead>
                                     <TableHead className="!whitespace-normal">Notes</TableHead>
-                                    <TableHead className="w-[50px]">Actions</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {memberFollowUps.length === 0 ? (
                                     <TableRow>
-                                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                                         No follow-ups recorded yet
                                       </TableCell>
                                     </TableRow>
@@ -1485,25 +1808,6 @@ export default function MembersContent() {
                                         <TableCell className="whitespace-nowrap">{followUp.method}</TableCell>
                                         <TableCell className="!whitespace-normal !break-words pr-4" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' } as React.CSSProperties}>
                                           {followUp.notes}
-                                        </TableCell>
-                                        <TableCell>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                                            onClick={async () => {
-                                              if (memberUUIDForHooks) {
-                                                await deleteFollowUp.mutateAsync({
-                                                  id: followUp.id,
-                                                  memberId: memberUUIDForHooks,
-                                                })
-                                              }
-                                            }}
-                                            disabled={deleteFollowUp.isPending}
-                                            title="Delete follow-up"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
                                         </TableCell>
                                       </TableRow>
                                     ))

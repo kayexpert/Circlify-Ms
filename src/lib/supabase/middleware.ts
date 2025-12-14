@@ -73,7 +73,7 @@ export async function updateSession(request: NextRequest) {
         .eq('user_id', user.id)
         .single()
 
-      if (session?.organization_id) {
+      if ((session as any)?.organization_id) {
         // User has an organization, redirect to dashboard
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'

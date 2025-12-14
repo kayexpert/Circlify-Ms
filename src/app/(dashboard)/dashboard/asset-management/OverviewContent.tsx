@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Edit, Archive, Search } from "lucide-react"
+import { Edit, Archive, Search, Loader2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { Loader } from "@/components/ui/loader"
 import { DatePicker } from "@/components/ui/date-picker"
 import { toast } from "sonner"
@@ -203,8 +204,21 @@ export default function OverviewContent({
                   </SelectTrigger>
                   <SelectContent>
                     {categories.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No categories available. Add categories first.
+                      <div className="px-2 py-6 text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          No asset categories available
+                        </p>
+                        <Link 
+                          href="/dashboard/asset-management?tab=categories"
+                          className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onNavigateToCategories()
+                          }}
+                        >
+                          <span>Click here to add asset categories</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
                       </div>
                     ) : (
                       categories.map((cat) => (

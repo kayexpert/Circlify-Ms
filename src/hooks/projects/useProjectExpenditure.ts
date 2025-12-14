@@ -64,8 +64,8 @@ export function useCreateProjectExpenditure() {
         throw new Error(`Invalid account_id format. Expected UUID, got: ${expenditureData.account_id} (type: ${typeof expenditureData.account_id})`)
       }
 
-      const { data, error } = await supabase
-        .from("project_expenditure")
+      const { data, error } = await (supabase
+        .from("project_expenditure") as any)
         .insert({
           ...expenditureData,
           project_id: projectId,
@@ -134,8 +134,8 @@ export function useUpdateProjectExpenditure() {
         throw new Error("Amount must be greater than 0")
       }
 
-      const { data, error } = await supabase
-        .from("project_expenditure")
+      const { data, error } = await (supabase
+        .from("project_expenditure") as any)
         .update({
           ...updateData,
           updated_at: new Date().toISOString(),
@@ -207,7 +207,7 @@ export function useDeleteProjectExpenditure() {
         throw error
       }
 
-      return expenditureData?.project_id
+      return (expenditureData as any)?.project_id
     },
     onSuccess: (projectId) => {
       if (projectId) {

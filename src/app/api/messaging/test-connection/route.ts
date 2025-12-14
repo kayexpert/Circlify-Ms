@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { verifyAuth } from "@/lib/middleware/api-auth"
 import { testWigalConnection, formatPhoneForWigal } from "@/lib/services/wigal-sms.service"
+import { z } from "zod"
+
+const testConnectionSchema = z.object({
+  apiKey: z.string().min(1, "API key is required"),
+  username: z.string().optional(),
+  senderId: z.string().min(1, "Sender ID is required"),
+  testPhoneNumber: z.string().min(1, "Test phone number is required"),
+})
 
 /**
  * POST /api/messaging/test-connection
@@ -9,34 +17,34 @@ import { testWigalConnection, formatPhoneForWigal } from "@/lib/services/wigal-s
  * Request body:
  * {
  *   apiKey: string
+ *   username?: string
  *   senderId: string
  *   testPhoneNumber: string
  * }
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    // Verify user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (authResult.error || !authResult.user) {
+      return authResult.error!
     }
 
-    // Get request body
+    // Get and validate request body
     const body = await request.json()
-    const { apiKey, username, senderId, testPhoneNumber } = body
+    const validationResult = testConnectionSchema.safeParse(body)
 
-    // Validate input
-    if (!apiKey || !username || !senderId || !testPhoneNumber) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "API key, username, sender ID, and test phone number are required" },
+        {
+          error: "Invalid request data",
+          details: validationResult.error.issues,
+        },
         { status: 400 }
       )
     }
+
+    const { apiKey, username, senderId, testPhoneNumber } = validationResult.data
 
     // Format phone number
     const formattedPhone = formatPhoneForWigal(testPhoneNumber)
@@ -45,7 +53,7 @@ export async function POST(request: NextRequest) {
     const result = await testWigalConnection(
       {
         apiKey,
-        username,
+        username: username || apiKey, // Fallback to apiKey if username not provided
         senderId,
       },
       formattedPhone

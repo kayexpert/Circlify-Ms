@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { verifyAuthAndOrganization } from "@/lib/middleware/api-auth"
 import { getWigalBalance } from "@/lib/services/wigal-sms.service"
+import { uuidSchema } from "@/lib/validations/schemas"
 
 /**
  * GET /api/messaging/balance
@@ -11,17 +13,16 @@ import { getWigalBalance } from "@/lib/services/wigal-sms.service"
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    // Verify user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Verify authentication and organization
+    const authResult = await verifyAuthAndOrganization(request)
+    if (authResult.error || !authResult.auth) {
+      return authResult.error!
     }
 
+    const { organizationId } = authResult.auth
+    const supabase = await createClient()
+
+    // Get and validate API config ID from query params
     const searchParams = request.nextUrl.searchParams
     const apiConfigId = searchParams.get("apiConfigId")
 
@@ -32,16 +33,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get user's organization
-    const { data: session } = await supabase
-      .from("user_sessions")
-      .select("organization_id")
-      .eq("user_id", user.id)
-      .single()
-
-    if (!(session as any)?.organization_id) {
+    // Validate UUID format
+    const apiConfigIdValidation = uuidSchema.safeParse(apiConfigId)
+    if (!apiConfigIdValidation.success) {
       return NextResponse.json(
-        { error: "No organization found" },
+        { error: "Invalid API configuration ID format", details: apiConfigIdValidation.error.issues },
         { status: 400 }
       )
     }
@@ -50,8 +46,8 @@ export async function GET(request: NextRequest) {
     const { data: apiConfig, error: apiConfigError } = await supabase
       .from("messaging_api_configurations")
       .select("id, name, api_key, username, sender_id, is_active, organization_id")
-      .eq("id", apiConfigId)
-      .eq("organization_id", (session as any).organization_id)
+      .eq("id", apiConfigIdValidation.data)
+      .eq("organization_id", organizationId)
       .single()
 
     if (apiConfigError || !apiConfig) {

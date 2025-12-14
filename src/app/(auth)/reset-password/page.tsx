@@ -2,18 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -22,10 +15,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 const resetPasswordSchema = z.object({
@@ -147,62 +139,90 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <Card className="border-2 shadow-xl">
-      <CardHeader className="space-y-2 pb-6">
-        <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-        <CardDescription className="text-base">Enter your new password</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">New Password</FormLabel>
-                  <FormControl>
-                    <PasswordInput
-                      placeholder="Enter new password"
-                      className="h-11"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto sm:pt-10">
+        <div>
+          <div className="mb-4 sm:mb-6">
+            <h1 className="mb-1.5 text-xl font-semibold text-gray-800 dark:text-white/90 sm:text-2xl">
+              Reset Password
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+              Enter your new password
+            </p>
+          </div>
+          <div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-400 sm:text-sm">
+                        New Password <span className="text-error-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <PasswordInput
+                            placeholder="Enter new password"
+                            className="h-9 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 pr-10 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Confirm Password</FormLabel>
-                  <FormControl>
-                    <PasswordInput
-                      placeholder="Confirm new password"
-                      className="h-11"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-400 sm:text-sm">
+                        Confirm Password <span className="text-error-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <PasswordInput
+                            placeholder="Confirm new password"
+                            className="h-9 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 pr-10 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <Button 
-              type="submit" 
-              className="w-full h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold shadow-lg transition-all duration-200" 
-              disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update Password
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full inline-flex items-center justify-center font-medium gap-2 rounded-lg transition px-4 py-2.5 text-sm bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Update Password
+                  </button>
+                </div>
+              </form>
+            </Form>
+
+            <div className="mt-5">
+              <Link
+                href="/signin"
+                className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 sm:text-sm inline-flex items-center"
+              >
+                <ArrowLeft className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                Back to Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

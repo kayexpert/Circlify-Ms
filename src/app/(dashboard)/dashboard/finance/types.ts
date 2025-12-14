@@ -31,6 +31,7 @@ export interface IncomeRecord {
   memberId?: number
   memberName?: string
   linkedAssetId?: number // For asset disposal tracking
+  linkedLiabilityId?: number // For loan tracking
   reconciledInReconciliation?: number | null
   isReconciled?: boolean
 }
@@ -59,6 +60,13 @@ export interface Liability {
   amountPaid: number
   balance: number
   status: "Not Paid" | "Partially Paid" | "Paid"
+  isLoan?: boolean
+  linkedIncomeRecordId?: number
+  interestRate?: number | null
+  loanStartDate?: Date | null
+  loanEndDate?: Date | null
+  loanDurationDays?: number | null
+  amountReceived?: number | null
   createdAt: Date
 }
 

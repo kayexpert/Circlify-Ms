@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { verifyAuth } from "@/lib/middleware/api-auth"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (authResult.error || !authResult.user) {
+      return authResult.error!
     }
 
     // Get the form data
@@ -23,13 +19,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "File must be an image" }, { status: 400 })
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: `File must be an image (${allowedTypes.join(", ")})` },
+        { status: 400 }
+      )
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size must be less than 5MB" }, { status: 400 })
+    // Validate file size (max 10MB before compression)
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: `File size must be less than ${maxSize / (1024 * 1024)}MB` },
+        { status: 400 }
+      )
     }
 
     // Get service role key for admin operations (bypasses RLS)
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Create a unique filename
     const fileExt = file.name.split(".").pop()
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    const fileName = `${authResult.user.id}-${Date.now()}.${fileExt}`
     const filePath = `avatars/${fileName}`
 
     // Convert File to ArrayBuffer for upload

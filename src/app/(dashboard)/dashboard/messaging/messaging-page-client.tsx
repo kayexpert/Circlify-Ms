@@ -21,8 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { 
   MessageSquare, Send, Eye, Trash2, Edit, Plus, X, 
   DollarSign, TrendingUp, Clock, Settings, Bell,
-  Users, Building, ChevronDown, Search, EyeOff, Loader2
+  Users, Building, ChevronDown, Search, EyeOff, Loader2, ExternalLink
 } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 import { Pagination } from "@/components/ui/pagination"
 import { Spinner, CompactLoader } from "@/components/ui/loader"
@@ -304,7 +305,7 @@ export function MessagingPageClient() {
         recipients: [{
           phone: recipientMember.phone_number,
           name: `${recipientMember.first_name} ${recipientMember.last_name}`,
-          memberId: recipientMember.id.toString(),
+          memberId: recipientMember.uuid,
         }],
         apiConfigId: activeApiConfig.id,
         templateId: individualForm.templateId || undefined,
@@ -353,7 +354,7 @@ export function MessagingPageClient() {
           .map((m: any) => ({
             phone: m.phone_number!,
             name: `${m.first_name} ${m.last_name}`,
-            memberId: m.id.toString(),
+            memberId: m.uuid,
           }))
       } else {
         recipientList = groupForm.recipients
@@ -362,7 +363,7 @@ export function MessagingPageClient() {
             return member && member.phone_number ? {
               phone: member.phone_number,
               name: `${member.first_name} ${member.last_name}`,
-              memberId: member.id.toString(),
+              memberId: member.uuid,
             } : null
           })
           .filter((r): r is { phone: string; name: string; memberId: string } => r !== null)
@@ -376,7 +377,7 @@ export function MessagingPageClient() {
           .map((m: any) => ({
             phone: m.phone_number!,
             name: `${m.first_name} ${m.last_name}`,
-            memberId: m.id.toString(),
+            memberId: m.uuid,
           }))
       }
     } else if ((groupForm as any).messageType === "department" && (groupForm as any).departmentId) {
@@ -388,7 +389,7 @@ export function MessagingPageClient() {
           .map((m: any) => ({
             phone: m.phone_number!,
             name: `${m.first_name} ${m.last_name}`,
-            memberId: m.id.toString(),
+            memberId: m.uuid,
           }))
       }
     }
@@ -664,15 +665,22 @@ export function MessagingPageClient() {
                             {truncateText(msg.message, 50)}
                           </TableCell>
                           <TableCell>
-                            <Badge 
-                              className={
-                                msg.status === "Sent" 
-                                  ? "bg-green-500 hover:bg-green-600" 
-                                  : "bg-red-500 hover:bg-red-600"
-                              }
-                            >
-                              {msg.status}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                              <Badge 
+                                className={
+                                  msg.status === "Sent" 
+                                    ? "bg-green-500 hover:bg-green-600" 
+                                    : "bg-red-500 hover:bg-red-600"
+                                }
+                              >
+                                {msg.status}
+                              </Badge>
+                              {msg.status === "Failed" && msg.errorMessage && (
+                                <span className="text-xs text-red-600 dark:text-red-400 max-w-xs truncate" title={msg.errorMessage}>
+                                  {msg.errorMessage}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
@@ -1676,20 +1684,45 @@ export function MessagingPageClient() {
                         <SelectValue placeholder="Select group or department" />
                       </SelectTrigger>
                       <SelectContent className="z-[110]">
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Groups</div>
-                        {groups.map((group) => (
-                          <SelectItem key={group.id} value={group.id}>
-                            <Users className="h-3 w-3 inline mr-2" />
-                            {group.name}
-                          </SelectItem>
-                        ))}
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Departments</div>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            <Building className="h-3 w-3 inline mr-2" />
-                            {dept.name}
-                          </SelectItem>
-                        ))}
+                        {groups.length === 0 && departments.length === 0 ? (
+                          <div className="px-2 py-6 text-center space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              No groups or departments available
+                            </p>
+                            <Link 
+                              href="/dashboard/members?tab=groups-departments"
+                              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                            >
+                              <span>Click here to add groups and departments</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          </div>
+                        ) : (
+                          <>
+                            {groups.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Groups</div>
+                                {groups.map((group) => (
+                                  <SelectItem key={group.id} value={group.id}>
+                                    <Users className="h-3 w-3 inline mr-2" />
+                                    {group.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            {departments.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Departments</div>
+                                {departments.map((dept) => (
+                                  <SelectItem key={dept.id} value={dept.id}>
+                                    <Building className="h-3 w-3 inline mr-2" />
+                                    {dept.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1805,6 +1838,14 @@ export function MessagingPageClient() {
                   {viewingMessage.status}
                 </Badge>
               </div>
+              {viewingMessage.status === "Failed" && viewingMessage.errorMessage && (
+                <div>
+                  <Label className="text-muted-foreground text-red-600">Error Message</Label>
+                  <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+                    {viewingMessage.errorMessage}
+                  </p>
+                </div>
+              )}
               {viewingMessage.cost && (
                 <div>
                   <Label className="text-muted-foreground">Cost</Label>

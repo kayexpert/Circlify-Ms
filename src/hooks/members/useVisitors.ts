@@ -283,6 +283,15 @@ export function useDeleteVisitor() {
     mutationFn: async (visitorId: string) => {
       if (!organization?.id) throw new Error("No organization selected")
 
+      // Get visitor data first to delete photo
+      const { data: visitorData } = await (supabase
+        .from("visitors") as any)
+        .select("photo")
+        .eq("id", visitorId)
+        .eq("organization_id", organization.id)
+        .single()
+
+      // Delete the visitor record
       const { error } = await (supabase
         .from("visitors") as any)
         .delete()
@@ -292,6 +301,20 @@ export function useDeleteVisitor() {
       if (error) {
         console.error("Error deleting visitor:", error)
         throw error
+      }
+
+      // Delete photo from storage if it exists
+      if (visitorData?.photo && typeof visitorData.photo === 'string' && !visitorData.photo.startsWith('data:')) {
+        try {
+          await fetch('/api/members/delete-photo', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoUrl: visitorData.photo }),
+          })
+        } catch (photoError) {
+          // Log but don't fail the deletion if photo deletion fails
+          console.error("Error deleting visitor photo from storage:", photoError)
+        }
       }
     },
     onSuccess: async () => {

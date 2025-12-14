@@ -88,6 +88,7 @@ export default function VisitorsContent() {
     follow_up_date: "",
   })
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [visitDate, setVisitDate] = useState<Date | undefined>(undefined)
   const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -135,14 +136,38 @@ export default function VisitorsContent() {
     }
   }
 
+  // Memoize search query and filter status to avoid recalculating
+  const searchQueryLower = useMemo(() => searchQuery.toLowerCase(), [searchQuery])
+  const filterStatusLower = useMemo(() => filterStatus.toLowerCase(), [filterStatus])
+  
   const filteredVisitors = useMemo(() => {
-    return allVisitors.filter((visitor: Visitor) => {
-      const searchText = `${visitor.first_name} ${visitor.last_name} ${visitor.email} ${visitor.phone_number}`.toLowerCase()
-      const matchesSearch = searchText.includes(searchQuery.toLowerCase())
-      const matchesStatus = filterStatus === "all" || visitor.status.toLowerCase() === filterStatus.toLowerCase()
-      return matchesSearch && matchesStatus
-    })
-  }, [allVisitors, searchQuery, filterStatus])
+    // Early return for no filters
+    if (!searchQueryLower && filterStatus === "all") {
+      return allVisitors
+    }
+    
+    // Use for loop for better performance
+    const results: Visitor[] = []
+    for (let i = 0; i < allVisitors.length; i++) {
+      const visitor = allVisitors[i]
+      
+      // Search filter
+      if (searchQueryLower) {
+        const searchText = `${visitor.first_name} ${visitor.last_name} ${visitor.email || ''} ${visitor.phone_number || ''}`.toLowerCase()
+        if (!searchText.includes(searchQueryLower)) {
+          continue
+        }
+      }
+      
+      // Status filter
+      if (filterStatus !== "all" && visitor.status.toLowerCase() !== filterStatusLower) {
+        continue
+      }
+      
+      results.push(visitor)
+    }
+    return results
+  }, [allVisitors, searchQueryLower, filterStatus, filterStatusLower])
 
   const resetForm = () => {
     setFormData({
@@ -231,9 +256,14 @@ export default function VisitorsContent() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!organization?.id) {
+      toast.error('Organization not found')
+      return
+    }
+
     // Validate file
-    const { validateImageFile } = await import('@/lib/utils/image-compression')
-    const validation = validateImageFile(file, 5) // Max 5MB before compression
+    const { validateImageFile, PROFILE_PHOTO_OPTIONS } = await import('@/lib/utils/image-compression')
+    const validation = validateImageFile(file, 10) // Max 10MB before compression
     
     if (!validation.isValid) {
       toast.error(validation.error || 'Invalid image file')
@@ -245,34 +275,64 @@ export default function VisitorsContent() {
     }
 
     try {
-      // Compress image before preview
+      setIsUploadingPhoto(true)
+      
+      // Delete old photo if it exists (when updating existing visitor)
+      const oldPhotoUrl = selectedVisitor?.photo || photoPreview
+      if (oldPhotoUrl && typeof oldPhotoUrl === 'string' && !oldPhotoUrl.startsWith('data:')) {
+        try {
+          await fetch('/api/members/delete-photo', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoUrl: oldPhotoUrl }),
+          })
+        } catch (deleteError) {
+          // Log but don't fail if old photo deletion fails
+          console.error('Error deleting old photo:', deleteError)
+        }
+      }
+      
+      // Compress image aggressively for profile photos
       const { compressImage } = await import('@/lib/utils/image-compression')
-      const compressedFile = await compressImage(file, {
-        maxSizeMB: 0.5, // Compress to max 500KB
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
+      const compressedFile = await compressImage(file, PROFILE_PHOTO_OPTIONS)
+      
+      // Upload compressed file to Supabase Storage
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', compressedFile)
+      uploadFormData.append('organizationId', organization.id)
+
+      const uploadResponse = await fetch('/api/members/upload-photo', {
+        method: 'POST',
+        body: uploadFormData,
       })
 
-      // Show preview of compressed image
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+      const uploadResult = await uploadResponse.json()
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadResult.error || 'Failed to upload photo')
       }
-      reader.readAsDataURL(compressedFile)
+
+      // Store the storage URL in photoPreview
+      setPhotoPreview(uploadResult.url)
       
       // Show compression info
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2)
-      const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2)
-      if (file.size > compressedFile.size) {
-        toast.success(`Image compressed from ${originalSizeMB}MB to ${compressedSizeMB}MB`)
-      }
+      const compressedSizeKB = (compressedFile.size / 1024).toFixed(2)
+      const compressionRatio = parseFloat(uploadResult.compressionRatio?.replace('%', '') || '0')
+      const compressionMessage = compressionRatio > 0.1 
+        ? `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB (${uploadResult.compressionRatio} reduction)`
+        : `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB`
+      toast.success(compressionMessage)
     } catch (error: any) {
-      console.error('Error compressing image:', error)
+      console.error('Error processing image:', error)
       toast.error(error.message || 'Failed to process image. Please try again.')
+      setPhotoPreview(null)
       // Reset file input
       if (e.target) {
         e.target.value = ''
       }
+    } finally {
+      setIsUploadingPhoto(false)
     }
   }
 
@@ -294,7 +354,7 @@ export default function VisitorsContent() {
           email: formData.email || undefined,
           phone_number: formData.phone_number,
           secondary_phone: formData.secondary_phone || undefined,
-          photo: photoPreview || undefined,
+          photo: photoPreview || undefined, // photoPreview now contains the Supabase Storage URL
           gender: formData.gender || undefined,
           date_of_birth: formData.date_of_birth || undefined,
           marital_status: formData.marital_status || undefined,
@@ -324,7 +384,7 @@ export default function VisitorsContent() {
           email: formData.email || "",
           phone_number: formData.phone_number,
           secondary_phone: formData.secondary_phone || undefined,
-          photo: photoPreview || undefined,
+          photo: photoPreview || undefined, // photoPreview now contains the Supabase Storage URL
           status: formData.status as "New" | "Returning",
           visit_date: formData.visit_date,
           source: formData.source as "Walk-in" | "Invited" | "Online",
@@ -584,7 +644,11 @@ export default function VisitorsContent() {
                     className="w-36 h-36 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group" 
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    {(photoPreview || selectedVisitor?.photo) ? (
+                    {isUploadingPhoto ? (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (photoPreview || (selectedVisitor?.photo && !selectedVisitor.photo.startsWith('data:'))) ? (
                       <Image 
                         src={photoPreview || selectedVisitor?.photo || ''} 
                         alt={selectedVisitor ? `${selectedVisitor.first_name} ${selectedVisitor.last_name}` : 'Profile'} 
@@ -597,9 +661,11 @@ export default function VisitorsContent() {
                         {formData.first_name?.[0] || ''}{formData.last_name?.[0] || ''}
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="h-8 w-8 text-white" />
-                    </div>
+                    {!isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera className="h-8 w-8 text-white" />
+                      </div>
+                    )}
                   </div>
                   <input 
                     ref={fileInputRef} 

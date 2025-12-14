@@ -80,7 +80,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
     if (!memberSearchQuery) return members
     const query = memberSearchQuery.toLowerCase()
     return members.filter(
-      (member) =>
+      (member: { first_name: string; last_name: string; email?: string | null }) =>
         member.first_name.toLowerCase().includes(query) ||
         member.last_name.toLowerCase().includes(query) ||
         `${member.first_name} ${member.last_name}`.toLowerCase().includes(query) ||
@@ -101,9 +101,9 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
   }, [accounts, expenditureAccountSearchQuery])
 
   // Get selected member and account names
-  const selectedMember = members.find((m) => m.uuid === incomeFormData.member_id)
-  const selectedAccount = accounts.find((a) => a.uuid === incomeFormData.account_id)
-  const selectedExpenditureAccount = accounts.find((a) => a.uuid === expenditureFormData.account_id)
+  const selectedMember = members.find((m: any) => (m.uuid || m.id) === incomeFormData.member_id)
+  const selectedAccount = accounts.find((a: any) => (a.uuid || a.id) === incomeFormData.account_id)
+  const selectedExpenditureAccount = accounts.find((a: any) => (a.uuid || a.id) === expenditureFormData.account_id)
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -453,7 +453,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                         />
                                         <span>None</span>
                                       </div>
-                                      {filteredMembers.map((member) => (
+                                      {filteredMembers.map((member: any) => (
                                         <div
                                           key={member.id}
                                           className={cn(
@@ -539,11 +539,11 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                               console.error("Account UUID is missing for account:", account)
                                             }
                                             // Try to get UUID from account.id if it's already a UUID
-                                            if (typeof account.id === 'string' && account.id.includes('-')) {
+                                            if (typeof (account as any).id === 'string' && (account as any).id.includes('-')) {
                                               if (process.env.NODE_ENV === "development") {
-                                                console.warn("Using account.id as UUID (it appears to be a UUID):", account.id)
+                                                console.warn("Using account.id as UUID (it appears to be a UUID):", (account as any).id)
                                               }
-                                              setIncomeFormData({ ...incomeFormData, account_id: account.id })
+                                              setIncomeFormData({ ...incomeFormData, account_id: String((account as any).id) })
                                             } else {
                                               if (process.env.NODE_ENV === "development") {
                                                 console.error("Cannot proceed: account has no UUID and id is not a UUID")
@@ -659,7 +659,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                   }
                                   // Fallback: look up member from members list
                                   if (record.member_id) {
-                                    const member = members.find((m) => m.uuid === record.member_id)
+                                    const member = members.find((m: any) => (m.uuid || m.id) === record.member_id)
                                     if (member) {
                                       return `${member.first_name} ${member.last_name}`
                                     }
@@ -668,7 +668,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                 })()}
                               </TableCell>
                               <TableCell>
-                                {accounts.find((a) => a.uuid === record.account_id)?.name || "N/A"}
+                                {accounts.find((a: any) => (a.uuid || a.id) === record.account_id)?.name || "N/A"}
                               </TableCell>
                               <TableCell>{record.description || "N/A"}</TableCell>
                               <TableCell>
@@ -678,8 +678,8 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                     variant="ghost"
                                     className="h-8 w-8 p-0"
                                     onClick={() => {
-                                      const recordMember = record.member_id ? members.find((m) => m.uuid === record.member_id) : null
-                                      const recordAccount = accounts.find((a) => a.uuid === record.account_id)
+                                      const recordMember = record.member_id ? members.find((m: any) => (m.uuid || m.id) === record.member_id) : null
+                                      const recordAccount = accounts.find((a: any) => (a.uuid || a.id) === record.account_id)
                                       
                                       setEditingIncomeId(record.id)
                                       setIncomeFormData({
@@ -793,11 +793,11 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                             console.error("Account UUID is missing for account:", account)
                                           }
                                           // Try to get UUID from account.id if it's already a UUID
-                                          if (typeof account.id === 'string' && account.id.includes('-')) {
+                                          if (typeof (account as any).id === 'string' && (account as any).id.includes('-')) {
                                             if (process.env.NODE_ENV === "development") {
-                                              console.warn("Using account.id as UUID (it appears to be a UUID):", account.id)
+                                              console.warn("Using account.id as UUID (it appears to be a UUID):", (account as any).id)
                                             }
-                                            setExpenditureFormData({ ...expenditureFormData, account_id: account.id })
+                                            setExpenditureFormData({ ...expenditureFormData, account_id: String((account as any).id) })
                                           } else {
                                             if (process.env.NODE_ENV === "development") {
                                               console.error("Cannot proceed: account has no UUID and id is not a UUID")
@@ -901,7 +901,7 @@ export function ProjectDetailsDrawer({ projectId, isOpen, onOpenChange }: Projec
                                 {formatCurrency(Number(record.amount), organization?.currency || "USD")}
                               </TableCell>
                               <TableCell>
-                                {accounts.find((a) => a.uuid === record.account_id)?.name || "N/A"}
+                                {accounts.find((a: any) => (a.uuid || a.id) === record.account_id)?.name || "N/A"}
                               </TableCell>
                               <TableCell>{record.description || "N/A"}</TableCell>
                               <TableCell>

@@ -12,9 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DatePicker } from "@/components/ui/date-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Trash2, Search, ChevronDown, Check, Loader2 } from "lucide-react"
+import { Edit, Trash2, Search, ChevronDown, Check, Loader2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { Loader, Spinner } from "@/components/ui/loader"
 import { toast } from "sonner"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
 import { cn } from "@/lib/utils"
 import { useIncomeRecordsPaginated, useCreateIncomeRecord, useUpdateIncomeRecord, useDeleteIncomeRecord } from "@/hooks/finance"
 import { useAccounts } from "@/hooks/finance"
@@ -56,6 +58,8 @@ export default function IncomeContent() {
   const [editingRecordUUID, setEditingRecordUUID] = useState<string | null>(null)
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [memberPopoverOpen, setMemberPopoverOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [recordToDelete, setRecordToDelete] = useState<IncomeRecord | null>(null)
 
   // Debounce search input to reduce filter operations
   useEffect(() => {
@@ -184,17 +188,25 @@ export default function IncomeContent() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
   }, [incomeRecords, debouncedSearchQuery])
 
-  const handleDelete = async (id: number) => {
-    const recordToDelete = incomeRecords.find((r: IncomeRecord) => r.id === id)
+  const handleDeleteClick = (id: number) => {
+    const record = incomeRecords.find((r: IncomeRecord) => r.id === id)
+    if (!record) return
+    setRecordToDelete(record)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     if (!recordToDelete) return
 
     try {
       // Get UUIDs
-      const recordUUID = await getIncomeRecordUUID(id)
+      const recordUUID = await getIncomeRecordUUID(recordToDelete.id)
       const accountUUID = await getAccountUUIDByName(recordToDelete.method)
 
       if (!recordUUID || !accountUUID) {
         toast.error("Failed to find record details")
+        setDeleteDialogOpen(false)
+        setRecordToDelete(null)
         return
       }
 
@@ -203,8 +215,12 @@ export default function IncomeContent() {
         accountId: accountUUID,
         amount: recordToDelete.amount,
       })
+      setDeleteDialogOpen(false)
+      setRecordToDelete(null)
     } catch (error) {
       // Error handled by hook
+      setDeleteDialogOpen(false)
+      setRecordToDelete(null)
     }
   }
 
@@ -385,11 +401,26 @@ export default function IncomeContent() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {categories.length === 0 ? (
+                    <div className="px-2 py-6 text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        No income categories available
+                      </p>
+                      <Link 
+                        href="/dashboard/finance?tab=categories"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
+                      >
+                        <span>Click here to add income categories</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  ) : (
+                    categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -583,10 +614,18 @@ export default function IncomeContent() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(record.id)}>
+                            {record.category !== "Opening Balance" && (
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(record)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleDeleteClick(record.id)}
+                              disabled={record.category === "Opening Balance"}
+                              title={record.category === "Opening Balance" ? "Opening balance records can only be deleted when the account is deleted" : "Delete record"}
+                            >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
@@ -616,6 +655,17 @@ export default function IncomeContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Income Record"
+        description={recordToDelete ? `Are you sure you want to delete this income record?\n\nDate: ${formatDate(recordToDelete.date)}\nCategory: ${recordToDelete.category}\nAmount: ${getCurrencySymbol(organization?.currency || "USD")}${recordToDelete.amount?.toLocaleString() || 0}\n\nThis action cannot be undone.` : ""}
+        confirmText="Delete"
+        isLoading={deleteIncomeRecord.isPending}
+      />
     </div>
   )
 }

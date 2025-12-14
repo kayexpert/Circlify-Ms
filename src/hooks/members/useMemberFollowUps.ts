@@ -64,6 +64,39 @@ export function useMemberFollowUps(memberId: string | null) {
 }
 
 /**
+ * Hook to fetch all follow-ups for all members in the organization
+ */
+export function useAllMemberFollowUps() {
+  const { organization } = useOrganization()
+  const supabase = createClient()
+  const orgId = organization?.id
+
+  return useQuery({
+    queryKey: ["member_follow_ups", "all", orgId],
+    queryFn: async () => {
+      if (!orgId) return []
+
+      const { data, error } = await (supabase
+        .from("member_follow_ups") as any)
+        .select("id, member_id, date, method, notes, created_by, created_at, updated_at, members(id, first_name, last_name)")
+        .eq("organization_id", orgId)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching all member follow-ups:", error)
+        throw error
+      }
+
+      return (data || []) as (MemberFollowUp & { members?: { id: string; first_name: string; last_name: string } | null })[]
+    },
+    enabled: !!orgId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000,
+  })
+}
+
+/**
  * Hook to create a new member follow-up
  */
 export function useCreateMemberFollowUp() {
@@ -100,6 +133,7 @@ export function useCreateMemberFollowUp() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["member_follow_ups", organization?.id, variables.member_id] })
+      queryClient.invalidateQueries({ queryKey: ["member_follow_ups", "all", organization?.id] })
       toast.success("Follow-up added successfully")
     },
     onError: (error: Error) => {
@@ -177,6 +211,7 @@ export function useDeleteMemberFollowUp() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["member_follow_ups", organization?.id, variables.memberId] })
+      queryClient.invalidateQueries({ queryKey: ["member_follow_ups", "all", organization?.id] })
       toast.success("Follow-up deleted successfully")
     },
     onError: (error: Error) => {

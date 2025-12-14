@@ -259,50 +259,118 @@ export function useDeleteCategory() {
         throw new Error("Category not found")
       }
 
-      // Prevent deleting default system categories
+      const categoryType = (category as any).type as "income" | "expense" | "liability"
+      const categoryName = (category as any).name
+
+      // Check if this is a default category
       const defaultCategories: Record<"income" | "expense" | "liability", string[]> = {
         income: ["Asset Disposal", "Opening Balance"],
         expense: [],
         liability: ["Liabilities"],
       }
+      const isDefaultCategory = defaultCategories[categoryType]?.includes(categoryName)
 
-      const categoryType = (category as any).type as "income" | "expense" | "liability"
-      if (defaultCategories[categoryType]?.includes((category as any).name)) {
-        throw new Error("Default system categories cannot be deleted")
-      }
+      // For default categories, delete all related records first (cascade delete)
+      if (isDefaultCategory) {
+        // For "Asset Disposal" category, first get all linked income records to find asset disposal records
+        if (categoryName === "Asset Disposal" && categoryType === "income") {
+          // Get all income records with this category to find their IDs
+          const { data: incomeRecords, error: incomeFetchError } = await supabase
+            .from("finance_income_records")
+            .select("id")
+            .eq("organization_id", organization.id)
+            .eq("category", categoryName)
 
-      // Check if category is in use
-      const { data: incomeRecords } = await supabase
-        .from("finance_income_records")
-        .select("id")
-        .eq("organization_id", organization.id)
-        .eq("category", (category as any).name)
-        .limit(1)
+          if (incomeFetchError) {
+            console.error("Error fetching related income records:", incomeFetchError)
+            throw new Error("Failed to fetch related income records")
+          }
 
-      const { data: expenseRecords } = await supabase
-        .from("finance_expenditure_records")
-        .select("id")
-        .eq("organization_id", organization.id)
-        .eq("category", (category as any).name)
-        .limit(1)
+          // Delete all asset disposal records linked to these income records
+          if (incomeRecords && incomeRecords.length > 0) {
+            const incomeIds = incomeRecords.map((r: { id: string }) => r.id)
+            const { error: disposalDeleteError } = await supabase
+              .from("asset_disposals")
+              .delete()
+              .eq("organization_id", organization.id)
+              .in("linked_income_id", incomeIds)
 
-      const { data: liabilityRecords } = await supabase
-        .from("finance_liabilities")
-        .select("id")
-        .eq("organization_id", organization.id)
-        .eq("category", (category as any).name)
-        .limit(1)
+            if (disposalDeleteError) {
+              console.error("Error deleting related asset disposal records:", disposalDeleteError)
+              throw new Error("Failed to delete related asset disposal records")
+            }
+          }
+        }
 
-      if (incomeRecords && incomeRecords.length > 0) {
-        throw new Error("Cannot delete category that is in use by income records")
-      }
+        // Delete all income records with this category
+        const { error: incomeDeleteError } = await supabase
+          .from("finance_income_records")
+          .delete()
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
 
-      if (expenseRecords && expenseRecords.length > 0) {
-        throw new Error("Cannot delete category that is in use by expenditure records")
-      }
+        if (incomeDeleteError) {
+          console.error("Error deleting related income records:", incomeDeleteError)
+          throw new Error("Failed to delete related income records")
+        }
 
-      if (liabilityRecords && liabilityRecords.length > 0) {
-        throw new Error("Cannot delete category that is in use by liability records")
+        // Delete all expenditure records with this category
+        const { error: expenseDeleteError } = await supabase
+          .from("finance_expenditure_records")
+          .delete()
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
+
+        if (expenseDeleteError) {
+          console.error("Error deleting related expenditure records:", expenseDeleteError)
+          throw new Error("Failed to delete related expenditure records")
+        }
+
+        // Delete all liability records with this category
+        const { error: liabilityDeleteError } = await supabase
+          .from("finance_liabilities")
+          .delete()
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
+
+        if (liabilityDeleteError) {
+          console.error("Error deleting related liability records:", liabilityDeleteError)
+          throw new Error("Failed to delete related liability records")
+        }
+      } else {
+        // For non-default categories, check if category is in use and prevent deletion
+        const { data: incomeRecords } = await supabase
+          .from("finance_income_records")
+          .select("id")
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
+          .limit(1)
+
+        const { data: expenseRecords } = await supabase
+          .from("finance_expenditure_records")
+          .select("id")
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
+          .limit(1)
+
+        const { data: liabilityRecords } = await supabase
+          .from("finance_liabilities")
+          .select("id")
+          .eq("organization_id", organization.id)
+          .eq("category", categoryName)
+          .limit(1)
+
+        if (incomeRecords && incomeRecords.length > 0) {
+          throw new Error("Cannot delete category that is in use by income records")
+        }
+
+        if (expenseRecords && expenseRecords.length > 0) {
+          throw new Error("Cannot delete category that is in use by expenditure records")
+        }
+
+        if (liabilityRecords && liabilityRecords.length > 0) {
+          throw new Error("Cannot delete category that is in use by liability records")
+        }
       }
 
       const { error } = await supabase
@@ -318,7 +386,14 @@ export function useDeleteCategory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["finance_categories", organization?.id] })
-      toast.success("Category deleted successfully")
+      queryClient.invalidateQueries({ queryKey: ["finance_income_records", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["finance_expenditure_records", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["finance_liabilities", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["asset_disposals", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["assets", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["finance_overview", organization?.id] })
+      queryClient.invalidateQueries({ queryKey: ["finance_monthly_trends", organization?.id] })
+      toast.success("Category and all related records deleted successfully")
     },
     onError: (error: Error) => {
       console.error("Failed to delete category:", error)

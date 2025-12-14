@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Edit, Trash2 } from "lucide-react"
+import { Search, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { useProjects, useDeleteProject } from "@/hooks/projects"
 import { useProjectCategories } from "@/hooks/projects"
@@ -54,12 +54,12 @@ export function ProjectsContent() {
       ])
 
       const incomeTotals: Record<string, number> = {}
-      incomeResult.data?.forEach((record) => {
+      incomeResult.data?.forEach((record: any) => {
         incomeTotals[record.project_id] = (incomeTotals[record.project_id] || 0) + Number(record.amount)
       })
 
       const expenditureTotals: Record<string, number> = {}
-      expenditureResult.data?.forEach((record) => {
+      expenditureResult.data?.forEach((record: any) => {
         expenditureTotals[record.project_id] = (expenditureTotals[record.project_id] || 0) + Number(record.amount)
       })
 
