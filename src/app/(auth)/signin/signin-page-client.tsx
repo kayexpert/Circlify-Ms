@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -36,12 +36,11 @@ const signInSchema = z.object({
 
 type SignInFormData = z.infer<typeof signInSchema>;
 
-export function SignInPageClient() {
-  const [isLoading, setIsLoading] = useState(false);
+// Separate component for searchParams to avoid blocking form render
+function EmailConfirmationHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Check for email confirmation success message
   useEffect(() => {
     const confirmed = searchParams.get('confirmed');
     if (confirmed === 'true') {
@@ -50,6 +49,13 @@ export function SignInPageClient() {
       router.replace('/signin');
     }
   }, [searchParams, router]);
+  
+  return null;
+}
+
+export function SignInPageClient() {
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   
   // Memoize Supabase client creation
   const supabase = React.useMemo(() => {
@@ -163,6 +169,9 @@ export function SignInPageClient() {
 
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+      <Suspense fallback={null}>
+        <EmailConfirmationHandler />
+      </Suspense>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto sm:pt-10">
         <div>
           <div className="mb-4 sm:mb-6">

@@ -418,10 +418,10 @@ export default function SetupOrganizationPage() {
 
           {isChecking && (
             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+              <div className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
                 <Loader className="h-4 w-4" size="sm" />
                 Checking organization...
-              </p>
+              </div>
             </div>
           )}
 
