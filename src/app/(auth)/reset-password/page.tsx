@@ -132,12 +132,6 @@ export default function ResetPasswordPage() {
     }
   }, [supabase, router, isValidSession]);
 
-  if (!isValidSession) {
-    return (
-      <Loader text="Verifying reset link..." size="lg" fullScreen />
-    );
-  }
-
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto sm:pt-10">
@@ -151,8 +145,16 @@ export default function ResetPasswordPage() {
             </p>
           </div>
           <div>
+            {!isValidSession && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying reset link...
+                </p>
+              </div>
+            )}
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate style={{ opacity: !isValidSession ? 0.5 : 1, pointerEvents: !isValidSession ? 'none' : 'auto' }}>
                 <FormField
                   control={form.control}
                   name="password"

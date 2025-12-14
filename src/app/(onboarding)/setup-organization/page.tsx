@@ -358,13 +358,6 @@ export default function SetupOrganizationPage() {
     setStep(step - 1);
   };
 
-  // Show loading while checking
-  if (isChecking) {
-    return (
-      <Loader text="Checking organization..." size="lg" fullScreen />
-    );
-  }
-
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto sm:pt-10">
@@ -423,8 +416,17 @@ export default function SetupOrganizationPage() {
             </div>
           </div>
 
+          {isChecking && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                <Loader className="h-4 w-4" size="sm" />
+                Checking organization...
+              </p>
+            </div>
+          )}
+
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" style={{ opacity: isChecking ? 0.5 : 1, pointerEvents: isChecking ? 'none' : 'auto' }}>
             {step === 1 && (
               <>
                 <FormField
