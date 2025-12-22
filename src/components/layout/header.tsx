@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
 import { ThemeToggleButton } from "./ThemeToggleButton"
 import NotificationDropdown from "./NotificationDropdown"
 import UserDropdown from "./UserDropdown"
@@ -9,10 +10,8 @@ import { useSidebarStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
 import { useOrganization } from "@/hooks/use-organization"
 import { getOrganizationTypeLabelLowercase } from "@/lib/utils/organization"
-
-// Map paths to page titles and descriptions
-import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import type { User } from "@/types/database"
 
 // Map paths to page titles and descriptions
 const getPageInfo = (pathname: string, orgType?: string | null, userName?: string): { title: string; description: string } => {
@@ -70,7 +69,8 @@ export function Header() {
           .single()
 
         if (userData) {
-          setUserName(userData.full_name || userData.email?.split('@')[0] || "")
+          const profile = userData as Pick<User, 'full_name' | 'email'>
+          setUserName(profile.full_name || profile.email?.split('@')[0] || "")
         }
       }
     }
