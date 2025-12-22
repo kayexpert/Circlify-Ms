@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   description: "Sign in to your account to access your organization's dashboard",
 }
 
+import { Suspense } from "react"
+import { AuthFormSkeletonDetailed } from "@/components/auth/auth-form-skeleton"
+
 export default function SignInPage() {
-  return <SignInPageClient />
+  return (
+    <Suspense fallback={<AuthFormSkeletonDetailed />}>
+      <SignInPageClient />
+    </Suspense>
+  )
 }

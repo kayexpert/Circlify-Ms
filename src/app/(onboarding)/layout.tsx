@@ -2,6 +2,9 @@ import { APP_NAME } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { AuthProvider } from "@/contexts/auth-context";
+import { AuthSideContent } from "@/components/auth/auth-side-content";
+import ThemeTogglerTwo from "@/components/auth/ThemeTogglerTwo";
 
 export default async function OnboardingLayout({
   children,
@@ -18,64 +21,35 @@ export default async function OnboardingLayout({
   }
 
   return (
-    <div className="relative p-6 bg-white z-1 dark:bg-gray-900 sm:p-0">
-      <div className="relative flex lg:flex-row w-full h-screen justify-center flex-col dark:bg-gray-900 sm:p-0">
-        {children}
-        <div className="lg:w-1/2 w-full h-full bg-brand-950 dark:bg-white/5 lg:grid items-center hidden">
-          <div className="relative items-center justify-center flex z-1">
-            <div className="flex flex-col items-center max-w-xs">
-              <div className="block mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="text-white"
-                    >
-                      <path
-                        d="M12 2L2 7L12 12L22 7L12 2Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M2 17L12 22L22 17"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M2 12L12 17L22 12"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <span className="text-xl font-bold text-white">Circlify CMS</span>
-                </div>
-              </div>
-              <p className="text-center text-gray-400 dark:text-white/60">
-                Free and Open-Source Tailwind CSS Admin Dashboard Template
-              </p>
-            </div>
+    <AuthProvider>
+      <div className="relative flex w-full h-screen overflow-hidden bg-white dark:bg-gray-900">
+        {/* Left column - Form */}
+        <div className="w-full lg:w-1/2 h-full overflow-y-auto no-scrollbar relative z-10 flex flex-col justify-center">
+          {children}
+        </div>
+
+        {/* Right column - Side Content */}
+        <div className="hidden lg:flex lg:w-1/2 h-full bg-brand-950 dark:bg-gray-950 items-center justify-center relative fixed right-0 top-0">
+          <div className="relative z-10 w-full h-full">
+            <AuthSideContent />
           </div>
         </div>
+
+        {/* Sign Out Button (Absolute) */}
         <div className="absolute top-4 right-4 z-50">
           <form action="/api/auth/signout" method="post">
-            <Button variant="outline" size="sm" type="submit" className="bg-white dark:bg-gray-800">
+            <Button variant="outline" size="sm" type="submit" className="bg-transparent text-white border-white hover:bg-white/10 hover:text-white backdrop-blur-sm">
               Sign Out
             </Button>
           </form>
         </div>
+
+        {/* Theme Toggler (Absolute Bottom Right) */}
+        <div className="absolute bottom-4 right-4 z-50 hidden lg:block">
+          <ThemeTogglerTwo />
+        </div>
       </div>
-    </div>
+    </AuthProvider>
   );
 }
 

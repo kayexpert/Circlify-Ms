@@ -5,6 +5,13 @@ export const metadata = {
   description: 'Verify your email to complete registration',
 };
 
+import { Suspense } from 'react';
+import { Loader } from '@/components/ui/loader';
+
 export default function CheckEmailPage() {
-  return <CheckEmailPageClient />;
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader /></div>}>
+      <CheckEmailPageClient />
+    </Suspense>
+  );
 }
