@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome to Circlify</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb;">
+
+    <center>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="background-color: #f9fafb; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+
+                    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+                        style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+
+                        <!-- Header -->
+                        <tr>
+                            <td align="center" style="background-color: #465fff; padding: 40px 20px;">
+                                <table role="presentation" width="64" height="64" cellpadding="0" cellspacing="0"
+                                    border="0">
+                                    <tr>
+                                        <td align="center" valign="middle"
+                                            style="background-color: rgba(255,255,255,0.15); border-radius: 50%; padding: 16px;">
+                                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
+                                                xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="16" cy="16" r="14" stroke="white" stroke-width="2.5"
+                                                    fill="none" />
+                                                <path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5"
+                                                    stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <h1 style="margin: 20px 0 0 0; font-size: 32px; font-weight: 700; color: #ffffff;">
+                                    Circlify</h1>
+                            </td>
+                        </tr>
+
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 48px 40px;">
+
+                                <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #101828;">
+                                    Welcome to Circlify!</h2>
+
+                                <p style="margin: 0 0 24px 0; font-size: 16px; color: #667085; line-height: 1.6;">Thank
+                                    you for signing up. To complete your registration and access your organization
+                                    management dashboard, please verify your email address by clicking the button below.
+                                </p>
+
+                                <!-- CTA Button -->
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td align="center" style="padding: 16px 0;">
+                                            <a href="{{ .ConfirmationURL }}"
+                                                style="display: inline-block; padding: 16px 40px; background-color: #465fff; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Verify
+                                                Email Address</a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <!-- Info Box -->
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                    style="margin: 24px 0;">
+                                    <tr>
+                                        <td
+                                            style="background-color: #f2f7ff; border-left: 4px solid #465fff; padding: 20px; border-radius: 8px;">
+                                            <p style="margin: 0; font-size: 14px; color: #344054; line-height: 1.6;">
+                                                <strong>👋 Quick tip:</strong> After verifying your email, you'll be
+                                                able to create your organization and start adding members, tracking
+                                                finances, managing events, and much more!</p>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <!-- Divider -->
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td style="padding: 24px 0;">
+                                            <div style="height: 1px; background-color: #e4e7ec;"></div>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <!-- Alternative Link -->
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #667085;">If the button doesn't
+                                    work, copy and paste this link into your browser:</p>
+                                <p style="margin: 0; font-size: 13px; color: #465fff; word-break: break-all;">{{
+                                    .ConfirmationURL }}</p>
+
+                            </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td
+                                style="background-color: #f9fafb; padding: 32px 40px; border-top: 1px solid #e4e7ec; text-align: center;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #98a2b3;">This email was sent to
+                                    verify your account. If you didn't sign up for Circlify, you can safely ignore this
+                                    email.</p>
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #98a2b3;">Have questions? <a
+                                        href="mailto:support@circlify.com"
+                                        style="color: #465fff; text-decoration: none;">Contact our support team</a></p>
+                                <p style="margin: 16px 0 0 0; font-size: 12px; color: #d0d5dd;">&copy; 2025 Circlify.
+                                    All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+
+                </td>
+            </tr>
+        </table>
+    </center>
+
+</body>
+
+</html>

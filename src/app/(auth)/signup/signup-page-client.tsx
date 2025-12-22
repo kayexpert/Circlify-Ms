@@ -44,7 +44,7 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 export function SignUpPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  
+
   // Memoize Supabase client creation
   const supabase = React.useMemo(() => {
     try {
@@ -102,24 +102,17 @@ export function SignUpPageClient() {
         return;
       }
 
-      // Show success message asking user to check their email
-      toast.success(
-        "Account created successfully! Please check your email to confirm your account before setting up your organization.",
-        { duration: 6000 }
-      );
-      
-      // Reset form and stay on signup page
-      form.reset();
-      setIsLoading(false);
+      // Redirect to check email page
+      router.push(`/signup/check-email?email=${encodeURIComponent(data.email.trim().toLowerCase())}`);
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("Sign up error:", error);
       }
-      
-      const message = error instanceof Error 
-        ? error.message 
+
+      const message = error instanceof Error
+        ? error.message
         : "An unexpected error occurred. Please try again.";
-      
+
       toast.error(message);
       setIsLoading(false);
     }
@@ -148,8 +141,8 @@ export function SignUpPageClient() {
       }
       // OAuth redirect will happen automatically
     } catch (error) {
-      const message = error instanceof Error 
-        ? error.message 
+      const message = error instanceof Error
+        ? error.message
         : "Failed to sign up with Google";
       toast.error(message);
       setIsLoading(false);
@@ -171,7 +164,7 @@ export function SignUpPageClient() {
             </p>
           </div>
           <div>
-            <button 
+            <button
               onClick={signUpWithGoogle}
               disabled={isLoading}
               className="w-full inline-flex items-center justify-center gap-3 py-2.5 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-6 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10"
