@@ -8,8 +8,8 @@ import { Users, UserPlus, DollarSign, Calendar, TrendingUp, TrendingDown, Cake, 
 import type { ComponentType } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@/types/database"
+
+
 import { CompactLoader } from "@/components/ui/loader"
 import { useMemberStatistics, useUpcomingBirthdays, useRecentMembers, useMemberGrowthData } from "@/hooks/members/useMemberStatistics"
 import { useFinanceOverview, useFinanceMonthlyTrends } from "@/hooks/finance/useFinanceStatistics"
@@ -33,12 +33,9 @@ type Stat = {
 }
 
 const COLORS = ["#8b5cf6", "#6366f1", "#3b82f6", "#0ea5e9"]
-
 export function DashboardPageClient() {
   const { organization, isLoading: orgLoading } = useOrganization()
   const { setPageLoading } = usePageLoading()
-  const [user, setUser] = useState<User | null>(null)
-  const supabase = createClient()
 
   // Fetch real data using optimized hooks
   const memberStatsQuery = useMemberStatistics()
@@ -52,30 +49,6 @@ export function DashboardPageClient() {
   const { data: events = [] } = eventsQuery
   const { data: visitorsData, isLoading: visitorsLoading } = useVisitorsPaginated(1, 100) // Get recent visitors
   const { data: growthData = [], isLoading: growthLoading } = useMemberGrowthData("all")
-
-  useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-      
-      if (authUser) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, email, full_name, avatar_url, created_at')
-          .eq('id', authUser.id)
-          .single()
-        
-        if (userData) {
-          setUser(userData)
-        }
-      }
-    }
-    
-    loadUser()
-  }, [supabase])
-
-  const userName = user?.full_name || user?.email?.split('@')[0] || "there"
 
   // Memoize stats calculation
   const stats = useMemo((): Stat[] => {
@@ -163,7 +136,7 @@ export function DashboardPageClient() {
     financeQuery,
     eventsQuery
   ])
-  
+
   // SIMPLIFIED: Only wait for organization, show page immediately after
   // Queries will load in background and show their own loading states
   const criticalLoading = useMemo(() => {
@@ -171,23 +144,23 @@ export function DashboardPageClient() {
     if (orgLoading) {
       return true
     }
-    
+
     const hasOrganization = !!organization?.id
-    
+
     // If no organization yet, we're still loading
     if (!hasOrganization) {
       return true
     }
-    
+
     // Once organization is ready, show the page immediately
     // Don't wait for queries - they can load in background
     return false
   }, [orgLoading, organization?.id])
-  
+
   // Use ref to track previous loading state and prevent unnecessary updates
   const prevLoadingRef = useRef(criticalLoading)
   const orgJustLoadedRef = useRef(false)
-  
+
   // Track when organization just finished loading
   useEffect(() => {
     if (orgLoading) {
@@ -197,13 +170,13 @@ export function DashboardPageClient() {
       orgJustLoadedRef.current = true
     }
   }, [orgLoading, organization?.id])
-  
+
   // Update page loading state - set to true when org is loading, false when ready
   useEffect(() => {
     // Set loading state based on org loading
     const isCurrentlyLoading = orgLoading || !organization?.id
     setPageLoading(isCurrentlyLoading)
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log('[DashboardClient] Page loading state:', isCurrentlyLoading, {
         orgLoading,
@@ -212,7 +185,7 @@ export function DashboardPageClient() {
       })
     }
   }, [orgLoading, organization?.id, setPageLoading])
-  
+
   // Safety timeout: if loader is stuck for more than 10 seconds, force it off
   // This is a last resort - proper completion detection should handle it
   useEffect(() => {
@@ -230,13 +203,13 @@ export function DashboardPageClient() {
         setPageLoading(false)
       }
     }, 10000)
-    
+
     // Cleanup
     return () => {
       clearTimeout(timeoutId)
     }
   }, [criticalLoading, setPageLoading, orgLoading, organization?.id, memberStatsQuery, financeQuery, eventsQuery])
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -252,10 +225,7 @@ export function DashboardPageClient() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, {userName}! Here's what's happening with your {getOrganizationTypeLabelLowercase(organization?.type)}.</p>
-      </div>
+
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -17,11 +17,6 @@ export function ReportsPageClient() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports & Analytics</h1>
-        <p className="text-muted-foreground">Comprehensive insights across all modules</p>
-      </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ReportType)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">

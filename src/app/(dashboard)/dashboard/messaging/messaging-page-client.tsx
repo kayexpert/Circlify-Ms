@@ -18,8 +18,8 @@ import { TimePicker } from "@/components/ui/time-picker"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { 
-  MessageSquare, Send, Eye, Trash2, Edit, Plus, X, 
+import {
+  MessageSquare, Send, Eye, Trash2, Edit, Plus, X,
   DollarSign, TrendingUp, Clock, Settings, Bell,
   Users, Building, ChevronDown, Search, EyeOff, Loader2, ExternalLink
 } from "lucide-react"
@@ -28,7 +28,7 @@ import { toast } from "sonner"
 import { Pagination } from "@/components/ui/pagination"
 import { Spinner, CompactLoader } from "@/components/ui/loader"
 import { formatDate, formatPhoneNumber, personalizeMessage, calculateSMSCost, truncateText, validateMessageLength } from "./utils"
-import type { 
+import type {
   Message, Template, APIConfiguration, NotificationSettings,
   IndividualMessageForm, GroupMessageForm, TemplateForm, APIConfigurationForm
 } from "./types"
@@ -61,10 +61,10 @@ export function MessagingPageClient() {
   const { organization } = useOrganization()
   // Main tab state
   const [activeTab, setActiveTab] = useState("messages")
-  
+
   // Configuration tab sub-tabs
   const [configSubTab, setConfigSubTab] = useState("api")
-  
+
   // Drawer states
   const [sendMessageDrawerOpen, setSendMessageDrawerOpen] = useState(false)
   const [sendMessageTab, setSendMessageTab] = useState<"individual" | "group">("individual")
@@ -75,7 +75,7 @@ export function MessagingPageClient() {
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null)
-  
+
   // Pagination state for messages
   const [messagesPage, setMessagesPage] = useState(1)
   const [messagesPageSize, setMessagesPageSize] = useState(20)
@@ -90,7 +90,7 @@ export function MessagingPageClient() {
   const { data: activeApiConfig } = useActiveAPIConfiguration()
   const { data: notificationSettings } = useNotificationSettings()
   const updateNotificationSettingsMutation = useUpdateNotificationSettings()
-  
+
   // Default notification settings to prevent undefined errors
   const safeNotificationSettings = notificationSettings || {
     birthdayMessagesEnabled: false,
@@ -99,7 +99,7 @@ export function MessagingPageClient() {
   const { data: members = [] } = useMembers()
   const { data: groups = [] } = useGroups()
   const { data: departments = [] } = useDepartments()
-  
+
   // Mutations
   const createTemplate = useCreateMessagingTemplate()
   const updateTemplate = useUpdateMessagingTemplate()
@@ -111,14 +111,14 @@ export function MessagingPageClient() {
   const deleteMessage = useDeleteMessage()
   const sendMessage = useSendMessage()
   const updateNotificationSettings = useUpdateNotificationSettings()
-  
+
   // Search state for member selection
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [individualRecipientSearch, setIndividualRecipientSearch] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
   const [recipientPopoverOpen, setRecipientPopoverOpen] = useState(false)
   const [groupRecipientsPopoverOpen, setGroupRecipientsPopoverOpen] = useState(false)
-  
+
   // Form states
   const [individualForm, setIndividualForm] = useState<IndividualMessageForm>({
     messageName: "",
@@ -126,7 +126,7 @@ export function MessagingPageClient() {
     templateId: "",
     message: "",
   })
-  
+
   const [groupForm, setGroupForm] = useState<GroupMessageForm>({
     messageName: "",
     messageType: "simple",
@@ -134,12 +134,12 @@ export function MessagingPageClient() {
     templateId: "",
     message: "",
   })
-  
+
   const [templateForm, setTemplateForm] = useState<TemplateForm>({
     name: "",
     message: "",
   })
-  
+
   const [apiConfigForm, setApiConfigForm] = useState<APIConfigurationForm>({
     name: "",
     apiKey: "",
@@ -147,22 +147,22 @@ export function MessagingPageClient() {
     senderId: "",
     isActive: false,
   })
-  
+
   // Fetch balance and analytics
   const { data: balance, isLoading: balanceLoading, error: balanceError } = useMessagingBalance()
   const { data: analytics } = useMessagingAnalytics()
-  
+
   // Calculate stats
   const stats = useMemo(() => {
     // Use analytics data instead of filtering paginated messages
     const totalMessagesSent = analytics?.sentMessages || 0
     const totalCost = analytics?.totalCost || 0
     const avgCost = analytics?.averageCostPerMessage || (totalMessagesSent > 0 ? totalCost / totalMessagesSent : 0)
-    
+
     // Use real balance from Wigal API - NO DUMMY DATA
     let balanceValue: string
     let balanceLabel = "Total Balance Left"
-    
+
     if (balanceLoading && activeApiConfig) {
       // Loading state when API config exists
       balanceValue = "Loading..."
@@ -186,45 +186,45 @@ export function MessagingPageClient() {
       balanceValue = "Not configured"
       balanceLabel = "Balance (Configure API)"
     }
-    
+
     return [
-      { 
-        label: balanceLabel, 
-        value: balanceValue, 
-        icon: DollarSign, 
-        color: "text-green-600", 
-        bg: "bg-green-50 dark:bg-green-950" 
+      {
+        label: balanceLabel,
+        value: balanceValue,
+        icon: DollarSign,
+        color: "text-green-600",
+        bg: "bg-green-50 dark:bg-green-950"
       },
-      { 
-        label: "Total Messages Sent", 
-        value: totalMessagesSent.toString(), 
-        icon: MessageSquare, 
-        color: "text-blue-600", 
-        bg: "bg-blue-50 dark:bg-blue-950" 
+      {
+        label: "Total Messages Sent",
+        value: totalMessagesSent.toString(),
+        icon: MessageSquare,
+        color: "text-blue-600",
+        bg: "bg-blue-50 dark:bg-blue-950"
       },
-      { 
-        label: "Average Cost", 
-        value: formatCurrency(avgCost, organization?.currency || "USD"), 
-        icon: TrendingUp, 
-        color: "text-purple-600", 
-        bg: "bg-purple-50 dark:bg-purple-950" 
+      {
+        label: "Average Cost",
+        value: formatCurrency(avgCost, organization?.currency || "USD"),
+        icon: TrendingUp,
+        color: "text-purple-600",
+        bg: "bg-purple-50 dark:bg-purple-950"
       },
     ]
   }, [messages, balance, analytics, balanceLoading, balanceError, activeApiConfig])
-  
+
   // Message validation
   const messageValidation = useMemo(() => {
-    const currentMessage = sendMessageTab === "individual" 
-      ? individualForm.message 
+    const currentMessage = sendMessageTab === "individual"
+      ? individualForm.message
       : groupForm.message
     return validateMessageLength(currentMessage)
   }, [individualForm.message, groupForm.message, sendMessageTab])
-  
+
   // Handle individual message form changes
   const handleIndividualFormChange = (field: keyof IndividualMessageForm, value: any) => {
     setIndividualForm(prev => {
       const updated = { ...prev, [field]: value }
-      
+
       // If template is selected, populate message
       if (field === "templateId" && value) {
         const template = templates.find(t => t.id === value)
@@ -232,23 +232,23 @@ export function MessagingPageClient() {
           updated.message = template.message
         }
       }
-      
+
       // Enforce 160 character limit on message
       if (field === "message" && typeof value === "string") {
         if (value.length > 160) {
           return prev // Don't update if exceeds limit
         }
       }
-      
+
       return updated
     })
   }
-  
+
   // Handle group message form changes
   const handleGroupFormChange = (field: keyof GroupMessageForm, value: any) => {
     setGroupForm(prev => {
       const updated = { ...prev, [field]: value }
-      
+
       // If template is selected, populate message
       if (field === "templateId" && value) {
         const template = templates.find(t => t.id === value)
@@ -256,52 +256,52 @@ export function MessagingPageClient() {
           updated.message = template.message
         }
       }
-      
+
       // Enforce 160 character limit on message
       if (field === "message" && typeof value === "string") {
         if (value.length > 160) {
           return prev // Don't update if exceeds limit
         }
       }
-      
+
       return updated
     })
   }
-  
+
   // Handle send individual message
   const handleSendIndividualMessage = async () => {
     if (!individualForm.messageName || !individualForm.recipient || !individualForm.message) {
       toast.error("Please fill in all required fields")
       return
     }
-    
+
     if (messageValidation.exceedsLimit) {
       toast.error("Message exceeds 160 character limit")
       return
     }
-    
+
     if (!activeApiConfig) {
       toast.error("No active API configuration found. Please configure your Wigal API settings first.")
       return
     }
-    
+
     const recipientMember = members.find((m: any) => m.id === parseInt(individualForm.recipient))
     if (!recipientMember || !recipientMember.phone_number) {
       toast.error("Recipient not found or phone number missing")
       return
     }
-    
+
     // Personalize message
     const personalizedMessage = personalizeMessage(individualForm.message, {
       FirstName: recipientMember.first_name,
       LastName: recipientMember.last_name,
       PhoneNumber: formatPhoneNumber(recipientMember.phone_number),
     })
-    
+
     try {
       await sendMessage.mutateAsync({
-      messageName: individualForm.messageName,
-      message: personalizedMessage,
+        messageName: individualForm.messageName,
+        message: personalizedMessage,
         recipients: [{
           phone: recipientMember.phone_number,
           name: `${recipientMember.first_name} ${recipientMember.last_name}`,
@@ -310,39 +310,39 @@ export function MessagingPageClient() {
         apiConfigId: activeApiConfig.id,
         templateId: individualForm.templateId || undefined,
       })
-    
-    // Reset form
-    setIndividualForm({
-      messageName: "",
-      recipient: "",
-      templateId: "",
-      message: "",
-    })
-    setSendMessageDrawerOpen(false)
+
+      // Reset form
+      setIndividualForm({
+        messageName: "",
+        recipient: "",
+        templateId: "",
+        message: "",
+      })
+      setSendMessageDrawerOpen(false)
     } catch (error) {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle send group message
   const handleSendGroupMessage = async () => {
     if (!groupForm.messageName || !groupForm.message) {
       toast.error("Please fill in all required fields")
       return
     }
-    
+
     if (messageValidation.exceedsLimit) {
       toast.error("Message exceeds 160 character limit")
       return
     }
-    
+
     if (!activeApiConfig) {
       toast.error("No active API configuration found. Please configure your Wigal API settings first.")
       return
     }
-    
+
     let recipientList: Array<{ phone: string; name?: string; memberId?: string }> = []
-    
+
     if (groupForm.messageType === "simple") {
       if (groupForm.recipients.length === 0) {
         toast.error("Please select at least one recipient")
@@ -393,48 +393,48 @@ export function MessagingPageClient() {
           }))
       }
     }
-    
+
     if (recipientList.length === 0) {
       toast.error("No recipients found with phone numbers")
       return
     }
-    
+
     try {
       await sendMessage.mutateAsync({
-      messageName: groupForm.messageName,
-      message: groupForm.message,
+        messageName: groupForm.messageName,
+        message: groupForm.message,
         recipients: recipientList,
         apiConfigId: activeApiConfig.id,
         templateId: groupForm.templateId || undefined,
       })
-    
-    // Reset form
-    setGroupForm({
-      messageName: "",
-      messageType: "simple",
-      recipients: [],
-      templateId: "",
-      message: "",
-    })
-    setSendMessageDrawerOpen(false)
+
+      // Reset form
+      setGroupForm({
+        messageName: "",
+        messageType: "simple",
+        recipients: [],
+        templateId: "",
+        message: "",
+      })
+      setSendMessageDrawerOpen(false)
     } catch (error) {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle delete message
   const handleDeleteMessage = async () => {
     if (!messageToDelete) return
-    
+
     try {
       await deleteMessage.mutateAsync(messageToDelete.id)
-    setDeleteDialogOpen(false)
-    setMessageToDelete(null)
+      setDeleteDialogOpen(false)
+      setMessageToDelete(null)
     } catch (error) {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle template save
   const handleSaveTemplate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -442,29 +442,29 @@ export function MessagingPageClient() {
       toast.error("Please fill in all required fields")
       return
     }
-    
+
     try {
-    if (editingTemplate && editingTemplateId) {
+      if (editingTemplate && editingTemplateId) {
         await updateTemplate.mutateAsync({
           id: editingTemplateId,
           name: templateForm.name,
           message: templateForm.message,
         })
-    } else {
+      } else {
         await createTemplate.mutateAsync({
-        name: templateForm.name,
-        message: templateForm.message,
+          name: templateForm.name,
+          message: templateForm.message,
         })
-    }
-    
-    setTemplateForm({ name: "", message: "" })
-    setEditingTemplate(null)
-    setEditingTemplateId(null)
+      }
+
+      setTemplateForm({ name: "", message: "" })
+      setEditingTemplate(null)
+      setEditingTemplateId(null)
     } catch (error) {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle delete template
   const handleDeleteTemplate = async (templateId: string) => {
     try {
@@ -473,7 +473,7 @@ export function MessagingPageClient() {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle API config save
   const handleSaveAPIConfig = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -481,9 +481,9 @@ export function MessagingPageClient() {
       toast.error("Please fill in all required fields")
       return
     }
-    
+
     try {
-    if (editingApiConfig && editingApiConfigId) {
+      if (editingApiConfig && editingApiConfigId) {
         await updateAPIConfig.mutateAsync({
           id: editingApiConfigId,
           name: apiConfigForm.name,
@@ -492,7 +492,7 @@ export function MessagingPageClient() {
           senderId: apiConfigForm.senderId,
           isActive: apiConfigForm.isActive,
         })
-    } else {
+      } else {
         await createAPIConfig.mutateAsync({
           name: apiConfigForm.name,
           apiKey: apiConfigForm.apiKey,
@@ -500,16 +500,16 @@ export function MessagingPageClient() {
           senderId: apiConfigForm.senderId,
           isActive: apiConfigForm.isActive,
         })
-    }
-    
-    setApiConfigForm({ name: "", apiKey: "", username: "", senderId: "", isActive: false })
-    setEditingApiConfig(null)
-    setEditingApiConfigId(null)
+      }
+
+      setApiConfigForm({ name: "", apiKey: "", username: "", senderId: "", isActive: false })
+      setEditingApiConfig(null)
+      setEditingApiConfigId(null)
     } catch (error) {
       // Error is handled by the mutation
     }
   }
-  
+
   // Handle test API connection
   const handleTestConnection = async () => {
     if (!apiConfigForm.apiKey || !apiConfigForm.username || !apiConfigForm.senderId) {
@@ -538,15 +538,9 @@ export function MessagingPageClient() {
       // Error is handled by the mutation
     }
   }
-  
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Messaging</h1>
-        <p className="text-muted-foreground">Send SMS messages to members and manage templates</p>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => {
@@ -583,7 +577,7 @@ export function MessagingPageClient() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Send SMS Message</CardTitle>
-                <Button 
+                <Button
                   onClick={() => {
                     if (!activeApiConfig) {
                       toast.error("Please configure your Wigal API settings first. Go to Configuration tab to add an active API configuration.")
@@ -605,8 +599,8 @@ export function MessagingPageClient() {
                   <p className="text-sm text-muted-foreground">
                     Please configure your Wigal API settings before sending messages.
                   </p>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setActiveTab("configuration")}
                     className="mt-2"
                   >
@@ -615,9 +609,9 @@ export function MessagingPageClient() {
                   </Button>
                 </div>
               ) : (
-              <p className="text-sm text-muted-foreground">
-                Click "Send SMS" to compose and send a new message to members.
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  Click "Send SMS" to compose and send a new message to members.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -655,7 +649,7 @@ export function MessagingPageClient() {
                           </TableCell>
                           <TableCell className="font-medium">{msg.messageName}</TableCell>
                           <TableCell>
-                            {Array.isArray(msg.recipient) 
+                            {Array.isArray(msg.recipient)
                               ? msg.recipientCount > 3
                                 ? `${msg.recipient.slice(0, 3).join(", ")}... (${msg.recipientCount} total)`
                                 : msg.recipient.join(", ")
@@ -666,10 +660,10 @@ export function MessagingPageClient() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <Badge 
+                              <Badge
                                 className={
-                                  msg.status === "Sent" 
-                                    ? "bg-green-500 hover:bg-green-600" 
+                                  msg.status === "Sent"
+                                    ? "bg-green-500 hover:bg-green-600"
                                     : "bg-red-500 hover:bg-red-600"
                                 }
                               >
@@ -684,15 +678,15 @@ export function MessagingPageClient() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => setViewingMessage(msg)}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => {
                                   setMessageToDelete(msg)
@@ -859,8 +853,8 @@ export function MessagingPageClient() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="flex-1"
                       disabled={createTemplate.isPending || updateTemplate.isPending}
                     >
@@ -874,9 +868,9 @@ export function MessagingPageClient() {
                       )}
                     </Button>
                     {editingTemplateId && (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => {
                           setTemplateForm({ name: "", message: "" })
                           setEditingTemplate(null)
@@ -924,8 +918,8 @@ export function MessagingPageClient() {
                           <TableCell className="max-w-[300px] truncate">{template.message}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   if (sendMessageTab === "individual") {
@@ -943,8 +937,8 @@ export function MessagingPageClient() {
                               >
                                 Use
                               </Button>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   setTemplateForm({ name: template.name, message: template.message })
@@ -955,8 +949,8 @@ export function MessagingPageClient() {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteTemplate(template.id)}
                                 disabled={deleteTemplate.isPending}
@@ -1059,8 +1053,8 @@ export function MessagingPageClient() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           className="flex-1"
                           disabled={createAPIConfig.isPending || updateAPIConfig.isPending}
                         >
@@ -1074,9 +1068,9 @@ export function MessagingPageClient() {
                           )}
                         </Button>
                         {editingApiConfigId && (
-                          <Button 
-                            type="button" 
-                            variant="outline" 
+                          <Button
+                            type="button"
+                            variant="outline"
                             onClick={() => {
                               setApiConfigForm({ name: "", apiKey: "", username: "", senderId: "", isActive: false })
                               setEditingApiConfig(null)
@@ -1135,8 +1129,8 @@ export function MessagingPageClient() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex gap-2">
-                                  <Button 
-                                    variant="outline" 
+                                  <Button
+                                    variant="outline"
                                     size="sm"
                                     onClick={() => {
                                       setApiConfigForm({
@@ -1153,8 +1147,8 @@ export function MessagingPageClient() {
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button 
-                                    variant="outline" 
+                                  <Button
+                                    variant="outline"
                                     size="sm"
                                     onClick={async () => {
                                       try {
@@ -1210,7 +1204,7 @@ export function MessagingPageClient() {
                         disabled={updateNotificationSettingsMutation.isPending}
                       />
                     </div>
-                    
+
                     {safeNotificationSettings.birthdayMessagesEnabled && (
                       <div className="space-y-2 pt-2 border-t">
                         <Label htmlFor="birthday-template">Select Template</Label>
@@ -1267,7 +1261,7 @@ export function MessagingPageClient() {
                         disabled={updateNotificationSettingsMutation.isPending}
                       />
                     </div>
-                    
+
                     {safeNotificationSettings.contributionNotificationsEnabled && (
                       <div className="space-y-2 pt-2 border-t">
                         <Label htmlFor="contribution-template">Select Template (Optional)</Label>
@@ -1297,8 +1291,8 @@ export function MessagingPageClient() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Available placeholders: {`{FirstName}`}, {`{LastName}`}, {`{Amount}`}, {`{Currency}`}, {`{Category}`}, {`{Date}`}
-                          </p>
-                        </div>
+                        </p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -1310,8 +1304,8 @@ export function MessagingPageClient() {
       </Tabs>
 
       {/* Send Message Drawer */}
-      <Sheet 
-        open={sendMessageDrawerOpen} 
+      <Sheet
+        open={sendMessageDrawerOpen}
         onOpenChange={(open) => {
           if (open && !activeApiConfig) {
             toast.error("Please configure your Wigal API settings first. Go to Configuration tab to add an active API configuration.")
@@ -1365,11 +1359,11 @@ export function MessagingPageClient() {
                       <span className="truncate">
                         {individualForm.recipient
                           ? (() => {
-                              const member = members.find((m: any) => m.id === parseInt(individualForm.recipient))
-                              return member && member.phone_number
-                                ? `${member.first_name} ${member.last_name} (${member.phone_number})`
-                                : "Select a member"
-                            })()
+                            const member = members.find((m: any) => m.id === parseInt(individualForm.recipient))
+                            return member && member.phone_number
+                              ? `${member.first_name} ${member.last_name} (${member.phone_number})`
+                              : "Select a member"
+                          })()
                           : "Search and select a member"}
                       </span>
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1419,10 +1413,10 @@ export function MessagingPageClient() {
                             .toLowerCase()
                             .includes(individualRecipientSearch.toLowerCase())
                         ).length === 0 && (
-                          <div className="py-6 text-center text-sm text-muted-foreground">
-                            No members found
-                          </div>
-                        )}
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                              No members found
+                            </div>
+                          )}
                       </div>
                     </ScrollArea>
                   </PopoverContent>
@@ -1473,7 +1467,7 @@ export function MessagingPageClient() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button 
+                <Button
                   type="button"
                   onClick={handleSendIndividualMessage}
                   className="flex-1"
@@ -1482,13 +1476,13 @@ export function MessagingPageClient() {
                   {sendMessage.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                  <Send className="h-4 w-4 mr-2" />
+                    <Send className="h-4 w-4 mr-2" />
                   )}
                   {!activeApiConfig ? "Configure API First" : "Send Now"}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setSendMessageDrawerOpen(false)}
                 >
                   Cancel
@@ -1538,7 +1532,7 @@ export function MessagingPageClient() {
                       >
                         <div className="flex flex-wrap gap-1 flex-1 mr-2">
                           {groupForm.recipients.includes("all") ? (
-                            <Badge variant="secondary" className="text-xs px-2 py-0.5 h-6 flex items-center">  
+                            <Badge variant="secondary" className="text-xs px-2 py-0.5 h-6 flex items-center">
                               All Members ({members.filter((m: any) => m.phone_number).length})
                             </Badge>
                           ) : groupForm.recipients.length > 0 ? (
@@ -1576,7 +1570,7 @@ export function MessagingPageClient() {
                                     onMouseDown={(e) => e.preventDefault()}
                                   >
                                     <X className="h-3 w-3" />
-                        </span>
+                                  </span>
                                 </Badge>
                               ) : null
                             })
@@ -1689,7 +1683,7 @@ export function MessagingPageClient() {
                             <p className="text-sm text-muted-foreground">
                               No groups or departments available
                             </p>
-                            <Link 
+                            <Link
                               href="/dashboard/members?tab=groups-departments"
                               className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
                             >
@@ -1773,7 +1767,7 @@ export function MessagingPageClient() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button 
+                <Button
                   type="button"
                   onClick={handleSendGroupMessage}
                   className="flex-1"
@@ -1782,13 +1776,13 @@ export function MessagingPageClient() {
                   {sendMessage.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                  <Send className="h-4 w-4 mr-2" />
+                    <Send className="h-4 w-4 mr-2" />
                   )}
                   {!activeApiConfig ? "Configure API First" : "Send Now"}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setSendMessageDrawerOpen(false)}
                 >
                   Cancel
@@ -1815,7 +1809,7 @@ export function MessagingPageClient() {
               <div>
                 <Label className="text-muted-foreground">Recipient(s)</Label>
                 <p>
-                  {Array.isArray(viewingMessage.recipient) 
+                  {Array.isArray(viewingMessage.recipient)
                     ? `${viewingMessage.recipientCount} recipients: ${viewingMessage.recipient.slice(0, 5).join(", ")}${viewingMessage.recipientCount > 5 ? "..." : ""}`
                     : viewingMessage.recipient}
                 </p>
@@ -1826,13 +1820,13 @@ export function MessagingPageClient() {
               </div>
               <div>
                 <Label className="text-muted-foreground">Status</Label>
-                <Badge 
+                <Badge
                   className={
                     (viewingMessage.status === "Sent"
                       ? "bg-green-500"
                       : (viewingMessage as any).status === "Scheduled"
-                      ? "bg-orange-500"
-                      : "bg-red-500")
+                        ? "bg-orange-500"
+                        : "bg-red-500")
                   }
                 >
                   {viewingMessage.status}

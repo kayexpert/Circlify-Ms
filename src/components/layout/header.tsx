@@ -11,10 +11,19 @@ import { useOrganization } from "@/hooks/use-organization"
 import { getOrganizationTypeLabelLowercase } from "@/lib/utils/organization"
 
 // Map paths to page titles and descriptions
-const getPageInfo = (pathname: string, orgType?: string | null): { title: string; description: string } => {
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+// Map paths to page titles and descriptions
+const getPageInfo = (pathname: string, orgType?: string | null, userName?: string): { title: string; description: string } => {
   const orgTypeLower = getOrganizationTypeLabelLowercase(orgType)
   if (pathname === "/dashboard" || pathname === "/dashboard/") {
-    return { title: "Dashboard", description: `Overview of your ${orgTypeLower}` }
+    return {
+      title: "Dashboard",
+      description: userName
+        ? `Welcome back, ${userName}! Here's what's happening with your ${orgTypeLower}.`
+        : `Overview of your ${orgTypeLower}`
+    }
   }
   if (pathname.startsWith("/dashboard/members")) {
     return { title: "Members", description: `Manage ${orgTypeLower} members, attendance, and groups` }
@@ -47,7 +56,28 @@ export function Header() {
   const { organization } = useOrganization()
   const { toggle, isOpen } = useSidebarStore()
   const pathname = usePathname()
-  const pageInfo = getPageInfo(pathname, organization?.type)
+  const [userName, setUserName] = useState<string>("")
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function getUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('full_name, email')
+          .eq('id', user.id)
+          .single()
+
+        if (userData) {
+          setUserName(userData.full_name || userData.email?.split('@')[0] || "")
+        }
+      }
+    }
+    getUser()
+  }, [supabase])
+
+  const pageInfo = getPageInfo(pathname, organization?.type, userName)
 
   return (
     <header className="flex-shrink-0 flex h-16 w-full items-center bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
@@ -72,8 +102,8 @@ export function Header() {
               </span>
               <span className="text-xs text-muted-foreground truncate">
                 {pageInfo.description}
-                </span>
-              </div>
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center justify-between w-full gap-4 px-5 h-16 lg:flex lg:justify-end lg:px-0 lg:shadow-none">

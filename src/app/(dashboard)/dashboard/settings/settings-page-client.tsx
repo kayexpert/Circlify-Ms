@@ -1,8 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings as SettingsIcon } from "lucide-react"
+import { Settings as SettingsIcon, Edit, Plus, X, Save } from "lucide-react"
 import { toast } from "sonner"
 import { useOrganization } from "@/hooks/use-organization"
 import { useOrganizationUsers } from "@/hooks/use-users"
@@ -11,9 +10,11 @@ import type { User } from "@/types/database"
 import { GeneralSettingsTab } from "./general-settings-tab"
 import { ProfileSettingsTab } from "./profile-settings-tab"
 import { UsersSettingsTab } from "./users-settings-tab"
-import { NotificationsSettingsTab } from "./notifications-settings-tab"
 import { UserFormSheet } from "./user-form-sheet"
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { Loader } from "@/components/ui/loader"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 export function SettingsPageClient() {
   const { organization, isLoading: orgLoading, refreshOrganization } = useOrganization()
@@ -28,6 +29,10 @@ export function SettingsPageClient() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [userToDelete, setUserToDelete] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  // Edit states for cards
+  const [isGeneralEditing, setIsGeneralEditing] = useState(false)
+  const [isProfileEditing, setIsProfileEditing] = useState(false)
 
   const [userFormData, setUserFormData] = useState({
     name: "",
@@ -55,15 +60,6 @@ export function SettingsPageClient() {
     full_name: "",
     email: "",
     avatar_url: "",
-  })
-
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    smsNotifications: true,
-    pushNotifications: false,
-    eventReminders: true,
-    birthdayReminders: true,
-    donationReceipts: true,
   })
 
   // Load current user profile
@@ -302,6 +298,7 @@ export function SettingsPageClient() {
       window.dispatchEvent(new CustomEvent("organizationUpdated"))
 
       toast.success("Organization settings have been updated successfully.")
+      setIsGeneralEditing(false)
     } catch (error: any) {
       console.error("Failed to save organization settings:", error)
       const errorMessage =
@@ -400,6 +397,7 @@ export function SettingsPageClient() {
       window.dispatchEvent(new CustomEvent("userProfileUpdated", { detail: updatedUser }))
 
       toast.success("Profile updated successfully.")
+      setIsProfileEditing(false)
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile")
     } finally {
@@ -407,93 +405,116 @@ export function SettingsPageClient() {
     }
   }
 
-  const handleSaveNotificationSettings = () => {
-    toast.success("Notification preferences have been updated successfully.")
-  }
-
   const userInitials = currentUser?.full_name
     ? currentUser.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2) || "U"
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U"
     : currentUser?.email?.[0]?.toUpperCase() || "U"
 
   if (orgLoading || usersLoading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading settings...</p>
-        </div>
-      </div>
-    )
+    return <Loader text="Loading settings..." className="h-[calc(100vh-200px)]" />
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <SettingsIcon className="h-8 w-8" />
-          Settings
-        </h1>
-        <p className="text-muted-foreground">Manage system settings and configurations</p>
+    <div className="space-y-6 max-w-[1600px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start h-full">
+        {/* Left Column: Organization Information */}
+        <Card className="h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>Organization Information</CardTitle>
+              <CardDescription>Basic information about your organization</CardDescription>
+            </div>
+            <Button
+              variant={isGeneralEditing ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setIsGeneralEditing(!isGeneralEditing)}
+            >
+              {isGeneralEditing ? (
+                <>Cancel</>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </>
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <GeneralSettingsTab
+              settings={organizationSettings}
+              onSettingsChange={setOrganizationSettings}
+              onSave={handleSaveOrganizationSettings}
+              isSaving={isSaving}
+              isEditing={isGeneralEditing}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Right Column: Profile and Users */}
+        <div className="flex flex-col gap-6">
+          {/* Profile Settings */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle>My Profile</CardTitle>
+                <CardDescription>Manage your personal information</CardDescription>
+              </div>
+              <Button
+                variant={isProfileEditing ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setIsProfileEditing(!isProfileEditing)}
+              >
+                {isProfileEditing ? (
+                  <>Cancel</>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </>
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <ProfileSettingsTab
+                profileData={profileData}
+                avatarPreview={avatarPreview}
+                userInitials={userInitials}
+                isUploadingAvatar={isUploadingAvatar}
+                isSaving={isSaving}
+                isEditing={isProfileEditing}
+                onProfileChange={setProfileData}
+                onAvatarUpload={handleAvatarUpload}
+                onSave={handleSaveProfile}
+              />
+            </CardContent>
+          </Card>
+
+          {/* User Management */}
+          <Card className="flex-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage organization users and their access</CardDescription>
+              </div>
+              <Button onClick={handleAddUser} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <UsersSettingsTab
+                users={users}
+                onEditUser={handleEditUser}
+                onDeleteUser={handleDeleteUserClick}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* Main Tabs */}
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
-
-        {/* General Settings */}
-        <TabsContent value="general" className="space-y-4">
-          <GeneralSettingsTab
-            settings={organizationSettings}
-            onSettingsChange={setOrganizationSettings}
-            onSave={handleSaveOrganizationSettings}
-            isSaving={isSaving}
-          />
-        </TabsContent>
-
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-4">
-          <ProfileSettingsTab
-            profileData={profileData}
-            avatarPreview={avatarPreview}
-            userInitials={userInitials}
-            isUploadingAvatar={isUploadingAvatar}
-            isSaving={isSaving}
-            onProfileChange={setProfileData}
-            onAvatarUpload={handleAvatarUpload}
-            onSave={handleSaveProfile}
-          />
-        </TabsContent>
-
-        {/* Users Management */}
-        <TabsContent value="users" className="space-y-4">
-          <UsersSettingsTab
-            users={users}
-            onAddUser={handleAddUser}
-            onEditUser={handleEditUser}
-            onDeleteUser={handleDeleteUserClick}
-          />
-        </TabsContent>
-
-        {/* Notifications */}
-        <TabsContent value="notifications" className="space-y-4">
-          <NotificationsSettingsTab
-            settings={notificationSettings}
-            onSettingsChange={setNotificationSettings}
-            onSave={handleSaveNotificationSettings}
-          />
-        </TabsContent>
-      </Tabs>
 
       {/* User Form Sheet */}
       <UserFormSheet

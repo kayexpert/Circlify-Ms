@@ -10,6 +10,8 @@ import { Header } from "@/components/layout/header";
 import { useOrganization } from "@/hooks/use-organization";
 import { PageLoadingProvider, usePageLoading } from "@/contexts/page-loading-context";
 
+import { IdleSessionManager } from "@/components/auth/idle-session-manager";
+
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,10 +21,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { organization, isLoading: orgLoading } = useOrganization();
   const { isPageLoading } = usePageLoading();
-  
+
   // Determine if we should show loader
   const shouldShowLoader = isLoading || orgLoading || isPageLoading;
-  
+
   // Handle smooth loader transition with fade-out
   useEffect(() => {
     if (shouldShowLoader) {
@@ -45,9 +47,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           data: { user: authUser },
           error: authError,
         } = await supabase.auth.getUser();
-        
+
         if (!mounted) return;
-        
+
         if (authError || !authUser) {
           router.replace("/signin");
           return;
@@ -59,22 +61,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           .select("id, email, full_name, avatar_url, created_at, updated_at")
           .eq("id", authUser.id)
           .single();
-        
+
         if (!mounted) return;
-        
+
         if (userData) {
           setUser(userData);
         }
-        
+
         // Step 3: Check if user has any organization_users link
         const { data: orgLink, error: orgLinkError } = await supabase
           .from("organization_users")
           .select("id")
           .eq("user_id", authUser.id)
           .limit(1);
-        
+
         if (!mounted) return;
-        
+
         if (orgLinkError || !orgLink || orgLink.length === 0) {
           // User has no organization - redirect to onboarding
           router.replace("/setup-organization");
@@ -88,9 +90,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           .select("organization_id")
           .eq("user_id", authUser.id)
           .maybeSingle();
-        
+
         if (!mounted) return;
-        
+
         if (sessionError || !session || !(session as any)?.organization_id) {
           // User has organization_users link but no active session
           // This means they haven't completed onboarding or session wasn't created
@@ -114,9 +116,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    
+
     loadUserAndCheckOrganization();
-    
+
     return () => {
       mounted = false;
     };
@@ -137,6 +139,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Only render dashboard if all checks passed
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <IdleSessionManager />
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden bg-background min-w-0">
         <Header />
