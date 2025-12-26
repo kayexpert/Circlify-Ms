@@ -65,6 +65,7 @@ export function useMemberAttendanceRecords(memberId: string | null) {
     enabled: !!orgId && !!memberId,
     staleTime: 0, // Always consider data stale to allow immediate refetch on invalidation
     gcTime: 10 * 60 * 1000,
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds for attendance
     refetchOnWindowFocus: true, // Refetch when window regains focus
   })
 }
@@ -155,17 +156,17 @@ export function useDeleteMemberAttendanceRecord() {
     },
     onSuccess: (_, variables) => {
       // Invalidate the specific member's attendance records
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["member_attendance_records", organization?.id, variables.memberId],
         refetchType: 'active'
       })
       // Also invalidate all member attendance records to ensure consistency
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["member_attendance_records", organization?.id],
         refetchType: 'active'
       })
       // Force refetch to ensure immediate update
-      queryClient.refetchQueries({ 
+      queryClient.refetchQueries({
         queryKey: ["member_attendance_records", organization?.id],
         type: 'active'
       })

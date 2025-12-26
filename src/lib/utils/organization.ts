@@ -7,8 +7,8 @@ import { ORGANIZATION_TYPES } from "@/lib/constants"
  */
 export function getOrganizationTypeLabel(type: string | null | undefined): string {
   if (!type) return "Organization"
-  
-  const orgType = ORGANIZATION_TYPES.find((ot) => ot.value === type)
+
+  const orgType = ORGANIZATION_TYPES.find((ot) => ot.value === type?.toLowerCase())
   return orgType?.label || "Organization"
 }
 

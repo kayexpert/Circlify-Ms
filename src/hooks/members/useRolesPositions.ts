@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { useOrganization } from "../use-organization"
 import { toast } from "sonner"
-import type { RolePosition as DBRolePosition, RolePositionInsert, RolePositionUpdate } from "@/types/database-extension"
+import type { RolePosition as DBRolePosition, RolePositionInsert, RolePositionUpdate, Member } from "@/types/database-extension"
 import type { RolePosition } from "@/app/(dashboard)/dashboard/members/types"
 
 // Helper to convert database RolePosition to component format
@@ -45,9 +45,10 @@ export function useRolesPositions() {
         .map((role) => convertRolePosition(role as DBRolePosition))
     },
     enabled: !!orgId,
-    staleTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: 60 * 1000, // 1 minute - roles change less often
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds for roles
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -107,6 +108,14 @@ export function useUpdateRolePosition() {
     mutationFn: async ({ id, ...updateData }: Partial<RolePosition> & { id: string }) => {
       if (!organization?.id) throw new Error("No organization selected")
 
+      // Get current role data to check for name change
+      const { data: currentRole } = await (supabase
+        .from("roles_positions") as any)
+        .select("name")
+        .eq("id", id)
+        .eq("organization_id", organization.id)
+        .single()
+
       const dbUpdateData: Partial<RolePositionUpdate> = {}
 
       if (updateData.name) dbUpdateData.name = updateData.name
@@ -124,6 +133,33 @@ export function useUpdateRolePosition() {
       if (error) {
         console.error("Error updating role/position:", error)
         throw error
+      }
+
+      // If name changed, update all members that have this role
+      if (currentRole && updateData.name && currentRole.name !== updateData.name) {
+        const oldName = (currentRole as DBRolePosition).name
+        const newName = updateData.name
+
+        // Find members with old role name
+        const { data: membersToUpdate } = await (supabase
+          .from("members") as any)
+          .select("id, roles")
+          .eq("organization_id", organization.id)
+          .contains("roles", [oldName])
+
+        if (membersToUpdate && membersToUpdate.length > 0) {
+          const updates = (membersToUpdate as Pick<Member, "id" | "roles">[]).map((member) => {
+            const updatedRoles = (member.roles || [])
+              .map((r: string) => r === oldName ? newName : r)
+
+            return (supabase
+              .from("members") as any)
+              .update({ roles: updatedRoles })
+              .eq("id", member.id)
+          })
+
+          await Promise.all(updates)
+        }
       }
 
       return convertRolePosition(data)

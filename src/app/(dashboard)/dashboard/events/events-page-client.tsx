@@ -14,13 +14,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { 
-  Calendar as CalendarIcon, 
-  Plus, 
-  MapPin, 
-  Users, 
-  Clock, 
-  List, 
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  MapPin,
+  Users,
+  Clock,
+  List,
   CalendarDays,
   Settings,
   Trash2,
@@ -37,6 +37,7 @@ import { useMembers } from "@/hooks/members/useMembers"
 import { useGroups } from "@/hooks/members/useGroups"
 import { useDepartments } from "@/hooks/members/useDepartments"
 import { useMessagingTemplates } from "@/hooks/messaging/useMessagingTemplates"
+import { useEventsRealtime } from "@/hooks/use-realtime-subscription"
 import { formatDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
 import FullCalendar from "@fullcalendar/react"
@@ -92,7 +93,10 @@ export function EventsPageClient() {
   const [deleteEventDialogOpen, setDeleteEventDialogOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<any>(null)
   const calendarRef = useRef<FullCalendar>(null)
-  
+
+  // Enable real-time subscriptions for live updates
+  useEventsRealtime()
+
   // Reminder recipient selection state
   const [reminderRecipientPopoverOpen, setReminderRecipientPopoverOpen] = useState(false)
   const [reminderSearchQuery, setReminderSearchQuery] = useState("")
@@ -136,11 +140,11 @@ export function EventsPageClient() {
     const withAttendance = events.filter(e => e.track_attendance)
 
     return [
-    { label: "Total Events", value: events.length, icon: CalendarIcon, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
+      { label: "Total Events", value: events.length, icon: CalendarIcon, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
       { label: "Upcoming", value: upcoming.length, icon: Clock, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950" },
       { label: "Past Events", value: past.length, icon: CalendarDays, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950" },
       { label: "Track Attendance", value: withAttendance.length, icon: Users, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-950" },
-  ]
+    ]
   }, [events])
 
   // Reset event form
@@ -197,7 +201,7 @@ export function EventsPageClient() {
   // Handle save event
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!eventForm.name || !eventForm.event_date) {
       toast.error("Please fill in all required fields")
       return
@@ -245,20 +249,20 @@ export function EventsPageClient() {
         reminder_message_text: eventForm.reminder_enabled && eventForm.reminder_message_text ? eventForm.reminder_message_text : null,
         color: eventForm.color || EVENT_COLORS[0],
       }
-    
-    if (selectedEvent) {
+
+      if (selectedEvent) {
         await updateEvent.mutateAsync({ id: selectedEvent.id, ...eventData })
-    } else {
+      } else {
         await createEvent.mutateAsync(eventData)
-    }
-    
+      }
+
       setIsEventSheetOpen(false)
       resetEventForm()
-    
-    // Refresh calendar view
-    if (calendarRef.current) {
-      calendarRef.current.getApi().refetchEvents()
-    }
+
+      // Refresh calendar view
+      if (calendarRef.current) {
+        calendarRef.current.getApi().refetchEvents()
+      }
     } catch (error) {
       // Error is handled by the mutation
     }
@@ -285,10 +289,10 @@ export function EventsPageClient() {
       // Always include selected groups even if they don't match search
       const selectedGroupIds = eventForm.reminder_recipient_ids.map(id => String(id))
       const selectedGroups = allGroups.filter(g => selectedGroupIds.includes(g.id))
-      const filteredGroups = reminderSearchQuery === "" 
-        ? allGroups 
+      const filteredGroups = reminderSearchQuery === ""
+        ? allGroups
         : allGroups.filter(g => g.name.toLowerCase().includes(reminderSearchQuery.toLowerCase()))
-      
+
       // Combine selected (always visible) with filtered, removing duplicates
       const combined = [...selectedGroups]
       filteredGroups.forEach(g => {
@@ -298,10 +302,10 @@ export function EventsPageClient() {
       })
       return combined
     } else if (eventForm.reminder_recipient_type === "selected_members") {
-      const allMembers = members.map((m: any) => ({ 
+      const allMembers = members.map((m: any) => ({
         id: String(m.uuid || m.id), // Use uuid (UUID string) if available, fallback to id
-        name: `${m.first_name} ${m.last_name}`, 
-        type: "member" 
+        name: `${m.first_name} ${m.last_name}`,
+        type: "member"
       }))
       // Always include selected members even if they don't match search
       const selectedMemberIds = eventForm.reminder_recipient_ids.map(id => String(id))
@@ -309,9 +313,9 @@ export function EventsPageClient() {
       const filteredMembers = reminderSearchQuery === ""
         ? allMembers
         : allMembers.filter((m: any) =>
-            m.name.toLowerCase().includes(reminderSearchQuery.toLowerCase())
-          )
-      
+          m.name.toLowerCase().includes(reminderSearchQuery.toLowerCase())
+        )
+
       // Combine selected (always visible) with filtered, removing duplicates
       const combined = [...selectedMembers]
       filteredMembers.forEach((m: { id: string; name: string; type: string }) => {
@@ -356,7 +360,7 @@ export function EventsPageClient() {
     return events.map((event) => {
       const eventDate = new Date(event.event_date)
       eventDate.setHours(0, 0, 0, 0)
-      
+
       // Use end_date if available, otherwise default to same day
       // For all-day events, FullCalendar expects the end date to be exclusive
       // (the day after the last day of the event)
@@ -402,7 +406,7 @@ export function EventsPageClient() {
     const startDate = new Date(selectInfo.start)
     startDate.setHours(0, 0, 0, 0)
     const endDate = selectInfo.end ? new Date(selectInfo.end) : undefined
-    
+
     setEventForm({
       ...eventForm,
       event_date: startDate,
@@ -483,35 +487,35 @@ export function EventsPageClient() {
             <>
 
               {/* Calendar View */}
-        <TabsContent value="calendar" className="space-y-4">
-          <Card className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark">
-            <CardContent className="p-0">
-              <div className="custom-calendar">
-                <FullCalendar
-                  ref={calendarRef}
-                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-                  initialView="dayGridMonth"
-                  headerToolbar={{
-                    left: "prev,next",
-                    center: "title",
-                    right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
-                  }}
-                  events={calendarEvents}
-                  selectable={true}
-                  select={handleDateSelect}
-                  eventClick={handleEventClick}
-                  eventContent={renderEventContent}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <TabsContent value="calendar" className="space-y-4">
+                <Card className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark">
+                  <CardContent className="p-0">
+                    <div className="custom-calendar">
+                      <FullCalendar
+                        ref={calendarRef}
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+                        initialView="dayGridMonth"
+                        headerToolbar={{
+                          left: "prev,next",
+                          center: "title",
+                          right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+                        }}
+                        events={calendarEvents}
+                        selectable={true}
+                        select={handleDateSelect}
+                        eventClick={handleEventClick}
+                        eventContent={renderEventContent}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               {/* List View */}
-        <TabsContent value="list" className="space-y-6">
-          {/* Upcoming Events */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
+              <TabsContent value="list" className="space-y-6">
+                {/* Upcoming Events */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
                   {upcomingEvents.length === 0 ? (
                     <Card>
                       <CardContent className="py-8 text-center text-muted-foreground">
@@ -519,36 +523,36 @@ export function EventsPageClient() {
                       </CardContent>
                     </Card>
                   ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {upcomingEvents.map((event) => (
-                        <Card 
-                          key={event.id} 
+                        <Card
+                          key={event.id}
                           className="cursor-pointer hover:shadow-lg transition-shadow"
                           onClick={() => handleEditEvent(event)}
                         >
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
                               <CardTitle className="text-lg">{event.name}</CardTitle>
                               {event.track_attendance && (
                                 <Badge variant="secondary">Track Attendance</Badge>
                               )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>{formatDate(event.event_date)}</span>
-                        {event.end_date && (
-                          <span className="text-muted-foreground"> - {formatDate(event.end_date)}</span>
-                        )}
-                      </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CalendarIcon className="h-4 w-4" />
+                              <span>{formatDate(event.event_date)}</span>
+                              {event.end_date && (
+                                <span className="text-muted-foreground"> - {formatDate(event.end_date)}</span>
+                              )}
+                            </div>
                             {event.location && (
-                        <div className="flex items-center gap-2 text-sm">
+                              <div className="flex items-center gap-2 text-sm">
                                 <MapPin className="h-4 w-4" />
                                 <span className="line-clamp-1">{event.location}</span>
-                        </div>
-                      )}
+                              </div>
+                            )}
                             {event.is_recurring && (
                               <Badge variant="outline" className="ml-2">
                                 Recurring: {event.recurrence_frequency}
@@ -559,43 +563,43 @@ export function EventsPageClient() {
                                 Reminders: {event.reminder_send_time === "day_before" ? "Day Before" : "Day Of"}
                               </Badge>
                             )}
-                    </CardContent>
-                  </Card>
+                          </CardContent>
+                        </Card>
                       ))}
                     </div>
-              )}
-          </div>
+                  )}
+                </div>
 
-          {/* Past Events */}
+                {/* Past Events */}
                 {pastEvents.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Past Events</h3>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Past Events</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {pastEvents.map((event) => (
-                        <Card 
-                          key={event.id} 
+                        <Card
+                          key={event.id}
                           className="cursor-pointer opacity-75 hover:opacity-100 transition-opacity"
                           onClick={() => handleEditEvent(event)}
                         >
-                    <CardHeader>
+                          <CardHeader>
                             <CardTitle className="text-lg">{event.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>{formatDate(event.event_date)}</span>
-                        {event.end_date && (
-                          <span className="text-muted-foreground"> - {formatDate(event.end_date)}</span>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CalendarIcon className="h-4 w-4" />
+                              <span>{formatDate(event.event_date)}</span>
+                              {event.end_date && (
+                                <span className="text-muted-foreground"> - {formatDate(event.end_date)}</span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
             </>
           )}
         </div>
@@ -615,18 +619,18 @@ export function EventsPageClient() {
             {/* Basic Information */}
             <div className="space-y-2">
               <Label htmlFor="event-name">Event Name *</Label>
-              <Input 
+              <Input
                 id="event-name"
                 value={eventForm.name}
                 onChange={(e) => setEventForm({ ...eventForm, name: e.target.value })}
-                required 
+                required
                 placeholder="e.g., Sunday Service"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="event-description">Description</Label>
-              <Textarea 
+              <Textarea
                 id="event-description"
                 value={eventForm.description}
                 onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
@@ -658,7 +662,7 @@ export function EventsPageClient() {
 
             <div className="space-y-2">
               <Label htmlFor="event-location">Location</Label>
-              <Input 
+              <Input
                 id="event-location"
                 value={eventForm.location}
                 onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
@@ -696,7 +700,7 @@ export function EventsPageClient() {
               <Checkbox
                 id="track-attendance"
                 checked={eventForm.track_attendance}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   setEventForm({ ...eventForm, track_attendance: checked as boolean })
                 }
               />
@@ -711,8 +715,8 @@ export function EventsPageClient() {
                 id="is-recurring"
                 checked={eventForm.is_recurring}
                 onCheckedChange={(checked) => {
-                  setEventForm({ 
-                    ...eventForm, 
+                  setEventForm({
+                    ...eventForm,
                     is_recurring: checked as boolean,
                     recurrence_frequency: checked ? "Weekly" : ""
                   })
@@ -728,7 +732,7 @@ export function EventsPageClient() {
                 <Label htmlFor="recurrence-frequency">Recurrence Frequency *</Label>
                 <Select
                   value={eventForm.recurrence_frequency}
-                  onValueChange={(value) => 
+                  onValueChange={(value) =>
                     setEventForm({ ...eventForm, recurrence_frequency: value as "Daily" | "Weekly" | "Monthly" | "Yearly" })
                   }
                   required={eventForm.is_recurring}
@@ -752,8 +756,8 @@ export function EventsPageClient() {
                 id="reminder-enabled"
                 checked={eventForm.reminder_enabled}
                 onCheckedChange={(checked) => {
-                  setEventForm({ 
-                    ...eventForm, 
+                  setEventForm({
+                    ...eventForm,
                     reminder_enabled: checked as boolean,
                     reminder_send_time: checked ? "day_before" : "",
                     reminder_recipient_type: checked ? "all_members" : "",
@@ -773,7 +777,7 @@ export function EventsPageClient() {
                   <Label htmlFor="reminder-send-time">When to send reminders *</Label>
                   <Select
                     value={eventForm.reminder_send_time}
-                    onValueChange={(value) => 
+                    onValueChange={(value) =>
                       setEventForm({ ...eventForm, reminder_send_time: value as "day_before" | "day_of" })
                     }
                     required={eventForm.reminder_enabled}
@@ -790,12 +794,12 @@ export function EventsPageClient() {
                     <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
                       {eventForm.reminder_send_time === "day_before" ? (
                         <>
-                          <strong>ℹ️ Note:</strong> For "day before" reminders, the reminder will be sent <strong>one day before</strong> the event date. 
+                          <strong>ℹ️ Note:</strong> For "day before" reminders, the reminder will be sent <strong>one day before</strong> the event date.
                           For example, if the event is on Dec 12, the reminder will be sent on Dec 11.
                         </>
                       ) : (
                         <>
-                          <strong>ℹ️ Note:</strong> For "day of" reminders, the reminder will be sent on the <strong>same day</strong> as the event. 
+                          <strong>ℹ️ Note:</strong> For "day of" reminders, the reminder will be sent on the <strong>same day</strong> as the event.
                           For example, if the event is on Dec 12, the reminder will be sent on Dec 12.
                         </>
                       )}
@@ -809,8 +813,8 @@ export function EventsPageClient() {
                   <Select
                     value={eventForm.reminder_recipient_type}
                     onValueChange={(value) => {
-                      setEventForm({ 
-                        ...eventForm, 
+                      setEventForm({
+                        ...eventForm,
                         reminder_recipient_type: value as "all_members" | "groups" | "selected_members",
                         reminder_recipient_ids: []
                       })
@@ -826,7 +830,7 @@ export function EventsPageClient() {
                       <SelectItem value="selected_members">Selected Members</SelectItem>
                     </SelectContent>
                   </Select>
-            </div>
+                </div>
 
                 {/* Reminder Recipient Selection */}
                 {eventForm.reminder_recipient_type && eventForm.reminder_recipient_type !== "all_members" && (
@@ -932,8 +936,8 @@ export function EventsPageClient() {
                   <Select
                     value={eventForm.reminder_template_id || "none"}
                     onValueChange={(value) => {
-                      setEventForm({ 
-                        ...eventForm, 
+                      setEventForm({
+                        ...eventForm,
                         reminder_template_id: value === "none" ? null : value,
                         // Clear custom message if template is selected
                         reminder_message_text: value !== "none" ? "" : eventForm.reminder_message_text
@@ -1148,8 +1152,8 @@ export function EventsPageClient() {
             )}
 
             <div className="flex gap-2 pt-4">
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="flex-1"
                 disabled={createEvent.isPending || updateEvent.isPending}
               >

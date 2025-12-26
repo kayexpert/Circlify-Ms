@@ -55,10 +55,15 @@ import { useMembers } from "@/hooks/members/useMembers"
 import { useGroups } from "@/hooks/members/useGroups"
 import { useDepartments } from "@/hooks/members/useDepartments"
 import { useOrganization } from "@/hooks/use-organization"
+import { useMessagesRealtime } from "@/hooks/use-realtime-subscription"
 import { formatCurrency, getCurrencySymbol } from "@/app/(dashboard)/dashboard/projects/utils"
 
 export function MessagingPageClient() {
   const { organization } = useOrganization()
+
+  // Enable real-time subscriptions for live updates
+  useMessagesRealtime()
+
   // Main tab state
   const [activeTab, setActiveTab] = useState("messages")
 

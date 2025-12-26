@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { CompactLoader } from "@/components/ui/loader"
+import { useFinanceRealtime } from "@/hooks/use-realtime-subscription"
 
 // Lazy load tab components - only load when needed
 const OverviewContent = lazy(() => import("./OverviewContent").then(m => ({ default: m.default })))
@@ -35,49 +36,49 @@ const dummyExpenditureRecords = [
 
 
 const dummyAccounts = [
-  { 
-    id: 1, 
-    name: "Main Account", 
+  {
+    id: 1,
+    name: "Main Account",
     accountType: "Bank" as const,
     bankName: "ABC Bank",
     accountNumber: "1234567890",
     bankAccountType: "Current Account" as const,
-    balance: 125000, 
+    balance: 125000,
     createdAt: new Date("2024-01-01")
   },
-  { 
-    id: 2, 
-    name: "Savings Account", 
+  {
+    id: 2,
+    name: "Savings Account",
     accountType: "Bank" as const,
     bankName: "XYZ Bank",
     accountNumber: "0987654321",
     bankAccountType: "Savings" as const,
-    balance: 50000, 
+    balance: 50000,
     createdAt: new Date("2024-01-01")
   },
 ]
 
 const dummyLiabilities = [
-  { 
-    id: 1, 
-    date: new Date("2024-01-01"), 
-    category: "Loans", 
-    description: "Building Loan", 
-    creditor: "ABC Bank", 
-    originalAmount: 500000, 
-    amountPaid: 150000, 
+  {
+    id: 1,
+    date: new Date("2024-01-01"),
+    category: "Loans",
+    description: "Building Loan",
+    creditor: "ABC Bank",
+    originalAmount: 500000,
+    amountPaid: 150000,
     balance: 350000,
     status: "Partially Paid",
     createdAt: new Date("2024-01-01")
   },
-  { 
-    id: 2, 
-    date: new Date("2024-01-15"), 
-    category: "Equipment", 
-    description: "Equipment Financing", 
-    creditor: "XYZ Finance", 
-    originalAmount: 25000, 
-    amountPaid: 10000, 
+  {
+    id: 2,
+    date: new Date("2024-01-15"),
+    category: "Equipment",
+    description: "Equipment Financing",
+    creditor: "XYZ Finance",
+    originalAmount: 25000,
+    amountPaid: 10000,
     balance: 15000,
     status: "Partially Paid",
     createdAt: new Date("2024-01-15")
@@ -113,6 +114,9 @@ export function FinancePageClient() {
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [sheetType, setSheetType] = useState<"income" | "expenditure" | "account" | "liability">("income")
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
+
+  // Enable real-time subscriptions for live updates
+  useFinanceRealtime()
 
   // Update tab when URL parameter changes
   useEffect(() => {
@@ -157,11 +161,11 @@ export function FinancePageClient() {
     amount: "",
     method: "",
     reference: "",
-      description: "",
-      status: "Pending",
-      budgeted: "",
-      period: "",
-      accountName: "",
+    description: "",
+    status: "Pending",
+    budgeted: "",
+    period: "",
+    accountName: "",
     bank: "",
     accountNumber: "",
     balance: "",
@@ -279,7 +283,7 @@ export function FinancePageClient() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (sheetType === "income") {
       const newRecord = {
         id: selectedRecord ? selectedRecord.id : incomeRecords.length + 1,
@@ -290,7 +294,7 @@ export function FinancePageClient() {
         method: formData.method,
         reference: formData.reference,
       }
-      
+
       if (selectedRecord) {
         setIncomeRecords(incomeRecords.map(r => r.id === selectedRecord.id ? newRecord : r))
         toast.success("Income record updated successfully")
@@ -309,7 +313,7 @@ export function FinancePageClient() {
         reference: formData.reference,
         status: formData.status,
       }
-      
+
       if (selectedRecord) {
         setExpenditureRecords(expenditureRecords.map(r => r.id === selectedRecord.id ? newRecord : r))
         toast.success("Expenditure record updated successfully")
@@ -328,7 +332,7 @@ export function FinancePageClient() {
         balance: parseFloat(formData.balance),
         createdAt: selectedRecord ? selectedRecord.createdAt : new Date(),
       }
-      
+
       if (selectedRecord) {
         setAccounts(accounts.map(a => a.id === selectedRecord.id ? newRecord : a) as typeof accounts)
         toast.success("Account updated successfully")
@@ -340,7 +344,7 @@ export function FinancePageClient() {
       const originalAmount = parseFloat(formData.totalAmount)
       const amountPaid = parseFloat(formData.paidAmount || "0")
       const balance = originalAmount - amountPaid
-      
+
       // Calculate status
       let status = "Not Paid"
       if (balance === 0) {
@@ -348,7 +352,7 @@ export function FinancePageClient() {
       } else if (balance > 0 && balance < originalAmount) {
         status = "Partially Paid"
       }
-      
+
       const newRecord = {
         id: selectedRecord ? selectedRecord.id : liabilities.length > 0 ? Math.max(...liabilities.map(l => l.id)) + 1 : 1,
         date: formData.date || new Date(),
@@ -361,7 +365,7 @@ export function FinancePageClient() {
         status: status,
         createdAt: selectedRecord ? selectedRecord.createdAt : new Date(),
       }
-      
+
       if (selectedRecord) {
         setLiabilities(liabilities.map(l => l.id === selectedRecord.id ? newRecord : l))
         toast.success("Liability updated successfully")
@@ -370,7 +374,7 @@ export function FinancePageClient() {
         toast.success("Liability added successfully")
       }
     }
-    
+
     setIsSheetOpen(false)
     resetForm()
   }

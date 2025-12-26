@@ -36,7 +36,9 @@ export function useCategories() {
       return (data || []).map(convertCategory)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 10 * 60 * 1000, // 10 minutes - categories don't change often
+    staleTime: 60 * 1000, // 1 minute - categories change less often
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -87,7 +89,9 @@ export function useCategoriesPaginated(page: number = 1, pageSize: number = 20) 
       }
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - categories change less often
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -118,7 +122,9 @@ export function useCategoriesByType(type: "income" | "expense" | "liability") {
       return (data || []).map(convertCategory)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - categories change less often
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -178,7 +184,7 @@ export function useUpdateCategory() {
       if (!organization?.id) throw new Error("No organization selected")
 
       const dbUpdateData: Partial<FinanceCategoryUpdate> = {}
-      
+
       // First, get the category to check if it's a default category
       const { data: existingCategory, error: fetchError } = await supabase
         .from("finance_categories")

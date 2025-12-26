@@ -53,9 +53,10 @@ export function useAttendanceRecords() {
       return (data || []).map(convertAttendanceRecord)
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds for attendance
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -108,9 +109,10 @@ export function useAttendanceRecordsPaginated(page: number = 1, pageSize: number
       }
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds for attendance
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -275,12 +277,12 @@ export function useDeleteAttendanceRecord() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance_records", organization?.id] })
       // Invalidate and refetch all member attendance records since we deleted all associated records
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["member_attendance_records", organization?.id],
         refetchType: 'active' // Force refetch of active queries
       })
       // Also explicitly refetch all member attendance queries to ensure immediate update
-      queryClient.refetchQueries({ 
+      queryClient.refetchQueries({
         queryKey: ["member_attendance_records", organization?.id],
         type: 'active'
       })

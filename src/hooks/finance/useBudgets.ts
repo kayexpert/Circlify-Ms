@@ -35,7 +35,9 @@ export function useBudgets() {
       return (data || []).map(convertBudget)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -66,7 +68,9 @@ export function useBudgetsByPeriod(period: string) {
       return (data || []).map(convertBudget)
     },
     enabled: !!organization?.id && !orgLoading && !!period,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -210,26 +214,26 @@ export function useUpdateBudgetSpent() {
       const startDate = period.endsWith("Q1")
         ? `${period.split("-")[0]}-01-01`
         : period.endsWith("Q2")
-        ? `${period.split("-")[0]}-04-01`
-        : period.endsWith("Q3")
-        ? `${period.split("-")[0]}-07-01`
-        : period.endsWith("Q4")
-        ? `${period.split("-")[0]}-10-01`
-        : period.length === 7
-        ? `${period}-01`
-        : `${period}-01-01`
+          ? `${period.split("-")[0]}-04-01`
+          : period.endsWith("Q3")
+            ? `${period.split("-")[0]}-07-01`
+            : period.endsWith("Q4")
+              ? `${period.split("-")[0]}-10-01`
+              : period.length === 7
+                ? `${period}-01`
+                : `${period}-01-01`
 
       const endDate = period.endsWith("Q1")
         ? `${period.split("-")[0]}-03-31`
         : period.endsWith("Q2")
-        ? `${period.split("-")[0]}-06-30`
-        : period.endsWith("Q3")
-        ? `${period.split("-")[0]}-09-30`
-        : period.endsWith("Q4")
-        ? `${period.split("-")[0]}-12-31`
-        : period.length === 7
-        ? `${period}-31`
-        : `${period}-12-31`
+          ? `${period.split("-")[0]}-06-30`
+          : period.endsWith("Q3")
+            ? `${period.split("-")[0]}-09-30`
+            : period.endsWith("Q4")
+              ? `${period.split("-")[0]}-12-31`
+              : period.length === 7
+                ? `${period}-31`
+                : `${period}-12-31`
 
       const { data: expenditures } = await supabase
         .from("finance_expenditure_records")

@@ -37,9 +37,10 @@ export function useAccounts() {
       return (data || []).map(convertAccount)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 30 * 1000, // 30 seconds - balances are updated by triggers, so we can cache longer
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000, // Keep in garbage collection for 5 minutes
-    refetchOnWindowFocus: false, // Don't refetch on focus to reduce unnecessary requests
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus for real-time updates
     refetchOnMount: true, // Refetch when component mounts to ensure fresh data
   })
 }
@@ -90,9 +91,10 @@ export function useAccountsPaginated(page: number = 1, pageSize: number = 20) {
       }
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnMount: true,
   })
 }
@@ -112,17 +114,17 @@ export function useCreateAccount() {
       }
 
       const dbData = convertAccountToDB(accountData, organization.id) as FinanceAccountInsert
-      
+
       // Ensure required fields are present
       if (!dbData.name || !dbData.account_type) {
         throw new Error("Account name and type are required")
       }
-      
+
       // Ensure balance is set (NOT NULL constraint)
       if (dbData.balance === undefined || dbData.balance === null) {
         dbData.balance = dbData.opening_balance ?? 0
       }
-      
+
       console.log("Creating account with data:", dbData)
 
       const { data, error } = await (supabase
@@ -140,7 +142,7 @@ export function useCreateAccount() {
           code: error.code,
           fullError: error
         })
-        
+
         // Handle specific error codes
         let errorMessage = "Failed to create account"
         if (error.code === "23505") { // Unique constraint violation
@@ -154,7 +156,7 @@ export function useCreateAccount() {
         } else if (error.hint) {
           errorMessage = error.hint
         }
-        
+
         throw new Error(errorMessage)
       }
 
@@ -166,11 +168,11 @@ export function useCreateAccount() {
     },
     onError: (error: Error | unknown) => {
       console.error("Failed to create account:", error)
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null && 'message' in error
-        ? String(error.message)
-        : "Failed to create account"
+          ? String(error.message)
+          : "Failed to create account"
       toast.error(errorMessage)
     },
   })
@@ -226,11 +228,11 @@ export function useUpdateAccount() {
     },
     onError: (error: Error | unknown) => {
       console.error("Failed to update account:", error)
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null && 'message' in error
-        ? String(error.message)
-        : "Failed to update account"
+          ? String(error.message)
+          : "Failed to update account"
       toast.error(errorMessage)
     },
   })
@@ -285,11 +287,11 @@ export function useDeleteAccount() {
     },
     onError: (error: Error | unknown) => {
       console.error("Failed to delete account:", error)
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null && 'message' in error
-        ? String(error.message)
-        : "Failed to delete account"
+          ? String(error.message)
+          : "Failed to delete account"
       toast.error(errorMessage)
     },
   })
@@ -323,8 +325,9 @@ export function useAccount(accountId: string | null) {
       return data ? convertAccount(data) : null
     },
     enabled: !!organization?.id && !!accountId && !orgLoading,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchOnWindowFocus: false,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -358,7 +361,7 @@ export function useRecalculateAccountBalances() {
           code: error.code,
           fullError: error
         })
-        
+
         // Extract error message properly
         let errorMessage = "Failed to recalculate account balances"
         if (error.message) {
@@ -370,7 +373,7 @@ export function useRecalculateAccountBalances() {
         } else if (error.code) {
           errorMessage = `Database error: ${error.code}`
         }
-        
+
         throw new Error(errorMessage)
       }
 
@@ -384,11 +387,11 @@ export function useRecalculateAccountBalances() {
     },
     onError: (error: Error | unknown) => {
       console.error("Failed to recalculate balances:", error)
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null && 'message' in error
-        ? String(error.message)
-        : "Failed to recalculate account balances"
+          ? String(error.message)
+          : "Failed to recalculate account balances"
       toast.error(errorMessage)
     },
   })

@@ -61,8 +61,10 @@ export function useEvents() {
       return (data || []) as (Event & { event_types?: { id: string; name: string } | null })[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -119,8 +121,8 @@ export function useCreateEvent() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to create event"
+            ? String(error.message)
+            : "Failed to create event"
       toast.error(errorMessage)
     },
   })
@@ -169,8 +171,8 @@ export function useUpdateEvent() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to update event"
+            ? String(error.message)
+            : "Failed to update event"
       toast.error(errorMessage)
     },
   })
@@ -225,8 +227,10 @@ export function useUpcomingEvents(daysAhead: number = 7) {
       return (data || []) as (Event & { event_types?: { id: string; name: string } | null })[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -263,8 +267,8 @@ export function useDeleteEvent() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to delete event"
+            ? String(error.message)
+            : "Failed to delete event"
       toast.error(errorMessage)
     },
   })

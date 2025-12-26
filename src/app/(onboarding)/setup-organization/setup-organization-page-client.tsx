@@ -50,10 +50,7 @@ const organizationSchema = z.object({
         z.string().email("Invalid email address"),
         z.literal(""),
     ]).optional(),
-    website: z.union([
-        z.string().url("Invalid URL format"),
-        z.literal(""),
-    ]).optional(),
+    website: z.string().optional(),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;

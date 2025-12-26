@@ -86,9 +86,10 @@ export function useMemberStatistics() {
       }
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - statistics should update reasonably fast
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -120,9 +121,10 @@ export function useUpcomingBirthdays(daysAhead: number = 365) {
       return (data || []) as UpcomingBirthday[]
     },
     enabled: !!orgId,
-    staleTime: 10 * 60 * 1000, // 10 minutes - birthdays don't change frequently
+    staleTime: 30 * 1000, // 30 seconds for birthday updates
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -153,9 +155,10 @@ export function useRecentMembers(limit: number = 10) {
       return (data || []) as RecentMember[]
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds for recent member updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -187,7 +190,7 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
         .eq("organization_id", orgId)
         .not("join_date", "is", null)
         .order("join_date", { ascending: true })
-        
+
       // Debug: Log member data for troubleshooting
       if (process.env.NODE_ENV === 'development') {
         console.log('Member growth data - Total members with join_date:', members?.length)
@@ -246,13 +249,13 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
       // Helper function to parse join_date safely
       const parseJoinDate = (joinDate: any): Date | null => {
         if (!joinDate) return null
-        
+
         try {
           // If it's already a Date object
           if (joinDate instanceof Date) {
             return joinDate
           }
-          
+
           // If it's a string, parse it
           if (typeof joinDate === 'string') {
             // Handle YYYY-MM-DD format
@@ -261,14 +264,14 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
               if (isNaN(year) || isNaN(month) || isNaN(day)) return null
               return new Date(year, month - 1, day) // month is 0-indexed
             }
-            
+
             // Try parsing as ISO string
             const parsed = new Date(joinDate)
             if (!isNaN(parsed.getTime())) {
               return parsed
             }
           }
-          
+
           return null
         } catch (error) {
           console.error('Error parsing join_date:', joinDate, error)
@@ -281,16 +284,16 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
       const result = periods.map((period) => {
         // Normalize period end to end of day for comparison
         const periodEndDate = new Date(period.end.getFullYear(), period.end.getMonth(), period.end.getDate(), 23, 59, 59, 999)
-        
+
         const membersByPeriod = members.filter((m: any) => {
           const joinDate = parseJoinDate(m.join_date)
           if (!joinDate) return false
-          
+
           // Include members who joined on or before the end of this period
           // Compare dates at start of day to avoid timezone issues
           const joinDateNormalized = new Date(joinDate.getFullYear(), joinDate.getMonth(), joinDate.getDate())
           const periodEndNormalized = new Date(periodEndDate.getFullYear(), periodEndDate.getMonth(), periodEndDate.getDate())
-          
+
           return joinDateNormalized <= periodEndNormalized
         })
 
@@ -302,7 +305,7 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
           active: activeByPeriod.length,
         }
       })
-      
+
       // Debug: Log result for troubleshooting (only in development)
       if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
         console.log('[Member Growth] Total members with join_date:', members.length)
@@ -310,13 +313,14 @@ export function useMemberGrowthData(timeFilter: "all" | "month" | "quarter" | "y
         console.log('[Member Growth] Final period data:', result[result.length - 1])
         console.log('[Member Growth] All periods:', result)
       }
-      
+
       return result
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds for growth data
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 

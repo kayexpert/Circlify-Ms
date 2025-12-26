@@ -87,9 +87,10 @@ export function useFinanceOverview() {
       }
     },
     enabled: !!orgId && !orgLoading,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
     gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -125,9 +126,10 @@ export function useFinanceMonthlyTrends(months: number = 6) {
       }))
     },
     enabled: !!orgId && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -163,9 +165,10 @@ export function useFinanceYearlyTrends(years: number = 5) {
       }))
     },
     enabled: !!orgId && !orgLoading,
-    staleTime: 10 * 60 * 1000, // 10 minutes - yearly data changes less frequently
+    staleTime: 60 * 1000, // 1 minute - yearly data changes less frequently
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 120 * 1000, // Auto-refetch every 2 minutes for yearly trends
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -199,9 +202,10 @@ export function useIncomeByCategory() {
       }))
     },
     enabled: !!orgId && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -235,9 +239,10 @@ export function useExpenditureByCategory() {
       }))
     },
     enabled: !!orgId && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 

@@ -49,8 +49,10 @@ export function useMessages() {
       })) as Message[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 30 * 1000, // 30 seconds - messages change frequently
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds - messages are highly dynamic
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -114,8 +116,10 @@ export function useMessagesPaginated(page: number = 1, pageSize: number = 20) {
       }
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds - messages are highly dynamic
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -178,8 +182,10 @@ export function useMessage(messageId: string | null) {
       }
     },
     enabled: !!organization?.id && !!messageId && !orgLoading,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 15 * 1000, // Auto-refetch every 15 seconds - messages are highly dynamic
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -216,8 +222,8 @@ export function useDeleteMessage() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to delete message"
+            ? String(error.message)
+            : "Failed to delete message"
       toast.error(errorMessage)
     },
   })

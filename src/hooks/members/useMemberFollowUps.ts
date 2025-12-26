@@ -58,8 +58,10 @@ export function useMemberFollowUps(memberId: string | null) {
       return (data || []) as MemberFollowUp[]
     },
     enabled: !!orgId && !!memberId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -91,8 +93,10 @@ export function useAllMemberFollowUps() {
       return (data || []) as (MemberFollowUp & { members?: { id: string; first_name: string; last_name: string } | null })[]
     },
     enabled: !!orgId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 

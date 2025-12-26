@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { webhookPayloadSchema } from "@/lib/validations/schemas"
-import { verifyWigalWebhookSignature } from "@/lib/utils/webhook-signature"
 
 /**
  * POST /api/messaging/webhook
  * Webhook endpoint for Wigal delivery status updates
  * This endpoint receives delivery status updates from Wigal
  * 
- * Note: Webhook signature verification is optional and can be enabled
- * by setting WIGAL_WEBHOOK_SECRET environment variable
+ * SECURITY MODEL (Multi-Tenant):
+ * - Each organization has their own Wigal account/API key
+ * - Signature verification is not used since there's no single shared secret
+ * - Security is maintained through:
+ *   1. Message ID format validation (must match MSG_{messageId}_{recipientId} format)
+ *   2. Database record validation (only existing records can be updated)
+ *   3. Organization isolation via RLS policies
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get request body for validation
-    // Note: For signature verification, we'd need raw body, but Next.js processes JSON
-    // If signature verification is needed, consider using middleware or edge runtime
     const body = await request.json()
-    
-    // Validate webhook payload
+
+    // Validate webhook payload structure
     const validationResult = webhookPayloadSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
@@ -32,18 +33,6 @@ export async function POST(request: NextRequest) {
 
     const { message_id, status, phone_number, timestamp, error } = validationResult.data
 
-    // Verify webhook signature if secret is configured
-    // Note: For production, webhook signatures should be verified
-    // This requires raw body access which may need middleware or edge runtime
-    // Currently allows webhooks for backward compatibility
-    // Set WIGAL_WEBHOOK_SECRET in production to enforce signature verification
-    if (process.env.WIGAL_WEBHOOK_SECRET) {
-      // TODO: Implement signature verification when raw body access is available
-      // For now, log a warning that signature verification should be implemented
-      console.warn("WIGAL_WEBHOOK_SECRET is set but signature verification not yet fully implemented")
-      // In production, you may want to add IP whitelisting as an alternative
-    }
-    
     const supabase = await createClient()
 
     // Extract message ID and recipient ID from Wigal message ID format
@@ -69,7 +58,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Update recipient status
-    const updateData: any = {
+    interface RecipientUpdateData {
+      status: "Sent" | "Failed" | "Pending"
+      sent_at?: string
+      error_message?: string
+    }
+
+    const updateData: RecipientUpdateData = {
       status: recipientStatus,
     }
 
@@ -81,8 +76,10 @@ export async function POST(request: NextRequest) {
       updateData.error_message = error
     }
 
-    const { error: updateError } = await (supabase
-      .from("messaging_message_recipients") as any)
+    // Note: messaging_message_recipients may not be in generated types
+    // Using type assertion to allow the query
+    const { error: updateError } = await (supabase as any)
+      .from("messaging_message_recipients")
       .update(updateData)
       .eq("id", recipientId)
       .eq("phone_number", phone_number)
@@ -103,11 +100,17 @@ export async function POST(request: NextRequest) {
       .eq("id", recipientId)
       .single()
 
+    // Define interface for message recipient
+    interface MessageRecipient {
+      message_id: string
+    }
+
     if (messageRecipient) {
+      const typedMessageRecipient = messageRecipient as MessageRecipient
       const { data: allRecipients } = await supabase
         .from("messaging_message_recipients")
         .select("status")
-        .eq("message_id", (messageRecipient as any).message_id)
+        .eq("message_id", typedMessageRecipient.message_id)
 
       if (allRecipients) {
         const typedRecipients = allRecipients as { status: string }[]
@@ -119,13 +122,13 @@ export async function POST(request: NextRequest) {
             ? "Failed"
             : "Sent"
 
-          await (supabase
-            .from("messaging_messages") as any)
+          await (supabase as any)
+            .from("messaging_messages")
             .update({
               status: messageStatus,
               sent_at: messageStatus === "Sent" ? timestamp || new Date().toISOString() : undefined,
             })
-            .eq("id", (messageRecipient as any).message_id)
+            .eq("id", typedMessageRecipient.message_id)
         }
       }
     }

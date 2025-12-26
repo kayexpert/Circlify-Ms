@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     // Check if this is an email confirmation by checking if user just confirmed email
     // or if type parameter indicates email confirmation
     const isEmailConfirmation = type === 'signup' || type === 'email' || type === 'recovery'
-    
+
     // Also check if user has an organization_users link
     // If they don't, they likely just confirmed email and should set up organization
     const { data: orgUsers } = await supabase
@@ -68,13 +68,14 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/dashboard', origin))
     }
 
-    // Default: redirect to signin
-    const signInUrl = new URL('/signin', origin)
-    return NextResponse.redirect(signInUrl)
+    // Default: redirect to setup-organization if they are logged in but have no organization
+    // This catches new OAuth users who haven't set up an organization yet
+    return NextResponse.redirect(new URL('/setup-organization', origin))
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Unexpected error in auth callback:', error)
     }
+
     // Redirect to signin on unexpected errors
     const signInUrl = new URL('/signin', origin)
     signInUrl.searchParams.set('error', 'unexpected_error')

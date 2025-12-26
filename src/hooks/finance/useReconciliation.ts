@@ -42,7 +42,9 @@ export function useReconciliationRecords() {
       return (data || []).map(convertReconciliation)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -93,7 +95,9 @@ export function useReconciliationRecordsPaginated(page: number = 1, pageSize: nu
       }
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -124,7 +128,9 @@ export function useReconciliationByAccount(accountId: string | null) {
       return (data || []).map(convertReconciliation)
     },
     enabled: !!organization?.id && !!accountId && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -352,7 +358,7 @@ export function useUpdateReconciliation() {
       if (currentReconciliation && reconciledIncomeEntryUUIDs !== undefined && markEntriesAsReconciled) {
         const previousIncomeEntries = ((currentReconciliation as FinanceReconciliationRecord).reconciled_income_entries || []) as string[]
         const entriesToUnmark = previousIncomeEntries.filter((entryId) => !reconciledIncomeEntryUUIDs.includes(entryId))
-        
+
         if (entriesToUnmark.length > 0) {
           await (supabase
             .from("finance_income_records") as any)
@@ -367,7 +373,7 @@ export function useUpdateReconciliation() {
       if (currentReconciliation && reconciledExpenditureEntryUUIDs !== undefined && markEntriesAsReconciled) {
         const previousExpenditureEntries = ((currentReconciliation as FinanceReconciliationRecord).reconciled_expenditure_entries || []) as string[]
         const entriesToUnmark = previousExpenditureEntries.filter((entryId) => !reconciledExpenditureEntryUUIDs.includes(entryId))
-        
+
         if (entriesToUnmark.length > 0) {
           await (supabase
             .from("finance_expenditure_records") as any)

@@ -62,9 +62,10 @@ export function useGroups() {
         .map((group) => convertGroup(group as DBGroup, groupCounts.get(group.name) || 0))
     },
     enabled: !!orgId,
-    staleTime: 15 * 60 * 1000, // 15 minutes - groups don't change often
+    staleTime: 60 * 1000, // 1 minute - groups change less often
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false, // Groups rarely change
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds for groups
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -125,6 +126,14 @@ export function useUpdateGroup() {
     mutationFn: async ({ id, ...updateData }: Partial<Group> & { id: string }) => {
       if (!organization?.id) throw new Error("No organization selected")
 
+      // Get current group data to check for name change
+      const { data: currentGroup } = await (supabase
+        .from("groups") as any)
+        .select("name")
+        .eq("id", id)
+        .eq("organization_id", organization.id)
+        .single()
+
       const dbUpdateData: Partial<GroupUpdate> = {}
 
       if (updateData.name) dbUpdateData.name = updateData.name
@@ -143,6 +152,33 @@ export function useUpdateGroup() {
       if (error) {
         console.error("Error updating group:", error)
         throw error
+      }
+
+      // If name changed, update all members that have this group
+      if (currentGroup && updateData.name && currentGroup.name !== updateData.name) {
+        const oldName = (currentGroup as DBGroup).name
+        const newName = updateData.name
+
+        // Find members with old group name
+        const { data: membersToUpdate } = await (supabase
+          .from("members") as any)
+          .select("id, groups")
+          .eq("organization_id", organization.id)
+          .contains("groups", [oldName])
+
+        if (membersToUpdate && membersToUpdate.length > 0) {
+          const updates = (membersToUpdate as Pick<Member, "id" | "groups">[]).map((member) => {
+            const updatedGroups = (member.groups || [])
+              .map((g: string) => g === oldName ? newName : g)
+
+            return (supabase
+              .from("members") as any)
+              .update({ groups: updatedGroups })
+              .eq("id", member.id)
+          })
+
+          await Promise.all(updates)
+        }
       }
 
       // Get member count

@@ -44,8 +44,10 @@ export function useMessagingTemplates() {
       })) as Template[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute - templates change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -86,8 +88,10 @@ export function useMessagingTemplate(templateId: string | null) {
       } as Template
     },
     enabled: !!organization?.id && !!templateId && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - templates change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -137,8 +141,8 @@ export function useCreateMessagingTemplate() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to create template"
+            ? String(error.message)
+            : "Failed to create template"
       toast.error(errorMessage)
     },
   })
@@ -192,8 +196,8 @@ export function useUpdateMessagingTemplate() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to update template"
+            ? String(error.message)
+            : "Failed to update template"
       toast.error(errorMessage)
     },
   })
@@ -232,8 +236,8 @@ export function useDeleteMessagingTemplate() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to delete template"
+            ? String(error.message)
+            : "Failed to delete template"
       toast.error(errorMessage)
     },
   })

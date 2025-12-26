@@ -31,9 +31,10 @@ export function useProjectExpenditure(projectId: string | null) {
       return (data || []) as ProjectExpenditure[]
     },
     enabled: !!organization?.id && !!projectId && !orgLoading,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -83,14 +84,14 @@ export function useCreateProjectExpenditure() {
             hint: error?.hint,
           })
         }
-        
+
         // Create a more descriptive error message
-        const errorMessage = 
-          error?.message || 
-          error?.details || 
-          error?.hint || 
+        const errorMessage =
+          error?.message ||
+          error?.details ||
+          error?.hint ||
           (error?.code ? `Database error (code: ${error.code})` : "Failed to create project expenditure")
-        
+
         throw new Error(errorMessage)
       }
 

@@ -29,8 +29,8 @@ function convertIncomeRecord(record: FinanceIncomeRecord): IncomeRecord {
 
 // Helper to convert component IncomeRecord to database format
 function convertToDatabaseFormat(
-  record: Partial<IncomeRecord>, 
-  organizationId: string, 
+  record: Partial<IncomeRecord>,
+  organizationId: string,
   accountId: string,
   memberId?: string | null,
   linkedLiabilityId?: string | null
@@ -82,8 +82,10 @@ export function useIncomeRecords(enabled: boolean = true) {
       return (data || []).map(convertIncomeRecord)
     },
     enabled: enabled && !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes - increase cache time
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -134,8 +136,10 @@ export function useIncomeRecordsPaginated(page: number = 1, pageSize: number = 2
       }
     },
     enabled: enabled && !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -184,12 +188,12 @@ export function useCreateIncomeRecord() {
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ["finance_income_records", organization?.id] })
       const previous = queryClient.getQueryData<IncomeRecord[]>(["finance_income_records", organization?.id])
-      
+
       const optimisticRecord: IncomeRecord = {
         ...variables.recordData,
         id: Date.now(), // Temporary ID
       }
-      
+
       queryClient.setQueryData<IncomeRecord[]>(["finance_income_records", organization?.id], (old = []) => [
         optimisticRecord,
         ...old,
@@ -252,7 +256,7 @@ export function useCreateIncomeRecord() {
                 notificationDate = dateObj
               }
             }
-            
+
             // Send notification asynchronously - don't block the UI
             sendContributionNotification({
               organizationId: organization.id,
@@ -335,17 +339,17 @@ export function useUpdateIncomeRecord() {
 
       const oldRecordAmount = oldAmount || ((oldRecord as any)?.amount ? Number((oldRecord as any).amount) : 0)
       const oldRecordAccountId = oldAccountId || (oldRecord as any)?.account_id
-      
+
       // Check if old record is an opening balance record
-      const oldIsOpeningBalance = 
+      const oldIsOpeningBalance =
         (oldRecord as any)?.category === "Opening Balance" ||
         ((oldRecord as any)?.reference && (oldRecord as any).reference.toLowerCase().includes("opening balance"))
 
       const updateData = convertToDatabaseFormat(recordData, organization.id, accountId, memberId)
       const newAmount = recordData.amount ? Number(recordData.amount) : oldRecordAmount
-      
+
       // Check if new record is an opening balance record
-      const newIsOpeningBalance = 
+      const newIsOpeningBalance =
         recordData.category === "Opening Balance" ||
         (recordData.reference && recordData.reference.toLowerCase().includes("opening balance"))
 

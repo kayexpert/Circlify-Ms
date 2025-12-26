@@ -44,10 +44,11 @@ export function useMembers() {
       return (data || []).map(convertMember)
     },
     enabled: !!orgId, // Only enabled when orgId exists (non-blocking)
-    staleTime: 5 * 60 * 1000, // 5 minutes - balance between freshness and performance
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
-    refetchOnReconnect: true, // Only refetch on reconnect
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
+    refetchOnReconnect: true, // Refetch on reconnect
   })
 }
 
@@ -100,9 +101,10 @@ export function useMembersPaginated(page: number = 1, pageSize: number = 20) {
       }
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -137,7 +139,9 @@ export function useMembersByStatus(status: "active" | "inactive" | "visitor") {
       return (data || []).map(convertMember)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -281,20 +285,20 @@ export function useUpdateMember() {
       if (orgId && updatedMember) {
         // Update individual member cache
         queryClient.setQueryData(["members", orgId, updatedMember.uuid], updatedMember)
-        
+
         // Update paginated cache if member is in current page
         queryClient.setQueriesData(
           { queryKey: ["members", "paginated", orgId] },
           (oldData: any) => {
             if (!oldData?.data) return oldData
-            const updated = oldData.data.map((m: Member) => 
+            const updated = oldData.data.map((m: Member) =>
               m.uuid === updatedMember.uuid ? updatedMember : m
             )
             return { ...oldData, data: updated }
           }
         )
       }
-      
+
       // Invalidate statistics queries (these need recalculation)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["member_statistics", orgId] }),
@@ -347,7 +351,7 @@ export function useDeleteMember() {
       // Use retry logic for transient failures
       if (memberData?.photo && typeof memberData.photo === 'string' && !memberData.photo.startsWith('data:')) {
         const { retry } = await import('@/lib/utils/retry')
-        
+
         try {
           await retry(
             async () => {
@@ -356,11 +360,11 @@ export function useDeleteMember() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ photoUrl: memberData.photo }),
               })
-              
+
               if (!response.ok) {
                 throw new Error(`Failed to delete photo: ${response.statusText}`)
               }
-              
+
               return response
             },
             {
@@ -430,6 +434,8 @@ export function useMember(memberId: string | null) {
       return data ? convertMember(data) : null
     },
     enabled: !!organization?.id && !!memberId && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }

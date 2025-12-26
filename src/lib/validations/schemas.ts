@@ -4,6 +4,28 @@
  */
 
 import { z } from "zod"
+import { stripHtml, sanitizeUrl as sanitizeUrlFn } from "@/lib/utils/sanitize"
+
+/**
+ * Custom Zod transformers for input sanitization
+ * These strip HTML tags from user input to prevent XSS
+ */
+
+// Sanitized string - strips HTML tags
+const sanitizedString = (maxLength: number = 500) =>
+  z.string().max(maxLength).transform((val) => stripHtml(val))
+
+// Sanitized optional string
+const sanitizedOptionalString = (maxLength: number = 500) =>
+  z.string().max(maxLength).optional().nullable().transform((val) =>
+    val ? stripHtml(val) : val
+  )
+
+// Sanitized URL - validates and sanitizes URL
+const sanitizedUrl = () =>
+  z.string().url().optional().nullable().transform((val) =>
+    val ? sanitizeUrlFn(val) : val
+  )
 
 // Member schemas
 export const memberSchema = z.object({

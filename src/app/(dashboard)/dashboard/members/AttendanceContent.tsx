@@ -35,14 +35,14 @@ export default function AttendanceContent() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all") // all, week, month, quarter, year
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [showDetailedFields, setShowDetailedFields] = useState(false)
-  
+
   // Member check-in state
   const [checkInEventId, setCheckInEventId] = useState<string | null>(null)
   // Track attendance status: 'present' | 'absent' | null (not selected)
   const [memberAttendanceStatus, setMemberAttendanceStatus] = useState<Map<number, 'present' | 'absent'>>(new Map())
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [checkInNotes, setCheckInNotes] = useState("")
-  
+
   // Map to store member number ID to UUID mapping (cached for performance)
   const [memberIdToUUIDMap, setMemberIdToUUIDMap] = useState<Map<number, string>>(new Map())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -64,11 +64,11 @@ export default function AttendanceContent() {
   const deleteMemberAttendance = useDeleteMemberAttendanceRecord()
 
   const isLoading = recordsLoading
-  
+
   // Helper to get attendance record UUID by number ID
   const getAttendanceRecordUUID = async (numberId: number): Promise<string | null> => {
     if (!organization?.id) return null
-    
+
     const currentRecord = allRecords.find(record => record.id === numberId)
     if (!currentRecord) return null
 
@@ -112,7 +112,7 @@ export default function AttendanceContent() {
   const serviceTypes = useMemo(() => {
     return eventsWithAttendance.map(e => e.name)
   }, [eventsWithAttendance])
-  
+
   const [formData, setFormData] = useState({
     date: '',
     service_type: '',
@@ -124,7 +124,7 @@ export default function AttendanceContent() {
     first_timers: 0,
     notes: ''
   })
-  
+
   const [activeAttendanceTab, setActiveAttendanceTab] = useState<"general" | "member-checkin">("general")
 
   const resetForm = () => {
@@ -164,11 +164,11 @@ export default function AttendanceContent() {
       first_timers: record.first_timers || 0,
       notes: record.notes || ''
     })
-    
+
     // Get UUID for the record
     const recordUUID = await getAttendanceRecordUUID(record.id)
     setSelectedRecordUUID(recordUUID)
-    
+
     // Load member attendance records for this date and service type
     if (record.date && record.service_type && organization?.id) {
       try {
@@ -178,18 +178,18 @@ export default function AttendanceContent() {
           .eq("organization_id", organization?.id)
           .eq("date", record.date)
           .eq("service_type", record.service_type)
-        
+
         if (!error && memberRecords && memberRecords.length > 0) {
           // Build status map from existing records
           const statusMap = new Map<number, 'present' | 'absent'>()
-          
+
           // Get notes from first record (they should all have the same notes)
           const firstRecord = memberRecords[0] as { notes?: string | null }
           setCheckInNotes(firstRecord?.notes || "")
-          
+
           // Get all member UUIDs with their statuses
           const memberRecordsWithStatus = memberRecords as { member_id: string; status?: string }[]
-          
+
           // Convert UUIDs to number IDs and mark with their status
           // First try using the cache
           for (const [numberId, uuid] of memberIdToUUIDMap.entries()) {
@@ -199,11 +199,11 @@ export default function AttendanceContent() {
               statusMap.set(numberId, status)
             }
           }
-          
+
           // For any UUIDs not found in cache, query directly
           const foundUUIDs = Array.from(statusMap.keys()).map(id => memberIdToUUIDMap.get(id)).filter(Boolean) as string[]
           const missingRecords = memberRecordsWithStatus.filter(r => !foundUUIDs.includes(r.member_id))
-          
+
           for (const memberRecord of missingRecords) {
             const { data: memberData } = await supabase
               .from("members")
@@ -211,7 +211,7 @@ export default function AttendanceContent() {
               .eq("id", memberRecord.member_id)
               .eq("organization_id", organization.id)
               .single()
-            
+
             if (memberData) {
               const numberId = parseInt((memberData as { id: string }).id.replace(/-/g, "").substring(0, 8), 16) || 0
               if (numberId > 0) {
@@ -222,7 +222,7 @@ export default function AttendanceContent() {
               }
             }
           }
-          
+
           setMemberAttendanceStatus(statusMap)
         } else {
           // No member records found, clear status and notes
@@ -237,7 +237,7 @@ export default function AttendanceContent() {
       // Reset notes if no record
       setCheckInNotes("")
     }
-    
+
     setIsSheetOpen(true)
   }
 
@@ -300,7 +300,7 @@ export default function AttendanceContent() {
   // Handle combined save (general + member check-in)
   const handleCombinedSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // First save general attendance
     if (!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === "") {
       toast.error("Please fill in all required fields in the General tab")
@@ -391,7 +391,7 @@ export default function AttendanceContent() {
       // Create new member check-ins - save both present and absent members
       if (allMemberStatuses.length > 0) {
         const selectedEvent = eventsWithAttendance.find(e => e.name === formData.service_type)
-        
+
         const memberStatusMap = new Map<string, 'present' | 'absent'>()
         for (const [numberId, status] of allMemberStatuses) {
           const uuid = getMemberUUIDFromNumberId(numberId)
@@ -399,11 +399,11 @@ export default function AttendanceContent() {
             memberStatusMap.set(uuid, status)
           }
         }
-        
+
         if (memberStatusMap.size > 0) {
           const results = []
           const errors = []
-          
+
           for (const [memberUUID, status] of memberStatusMap.entries()) {
             try {
               await createMemberAttendance.mutateAsync({
@@ -420,11 +420,11 @@ export default function AttendanceContent() {
               errors.push({ memberUUID, error: error.message || "Unknown error" })
             }
           }
-          
+
           if (results.length > 0) {
             toast.success(`${isUpdate ? 'Updated' : 'Recorded'} attendance successfully for ${results.length} member${results.length !== 1 ? 's' : ''}`)
           }
-          
+
           if (errors.length > 0) {
             console.warn(`Failed to record attendance for ${errors.length} member(s):`, errors)
             if (errors.length === memberStatusMap.size) {
@@ -452,14 +452,14 @@ export default function AttendanceContent() {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), now.getDate())
   }, [])
-  
+
   // Memoize period boundaries
   const periodBoundaries = useMemo(() => {
     if (selectedPeriod === "all") return null
-    
+
     const todayYear = today.getFullYear()
     const todayMonth = today.getMonth()
-    
+
     switch (selectedPeriod) {
       case "week": {
         const dayOfWeek = today.getDay()
@@ -494,7 +494,7 @@ export default function AttendanceContent() {
         return null
     }
   }, [selectedPeriod, today])
-  
+
   // Filter records by service type and time period
   const filteredRecords = useMemo(() => {
     // Early returns for no filters
@@ -506,7 +506,7 @@ export default function AttendanceContent() {
         return dateB.getTime() - dateA.getTime()
       })
     }
-    
+
     let filtered = allRecords
 
     // Filter by service type
@@ -533,29 +533,29 @@ export default function AttendanceContent() {
 
   // Calculate stats based on filtered records
   const stats = useMemo(() => [
-    { 
-      label: "Total Records", 
-      value: filteredRecords.length, 
-      icon: Calendar, 
-      color: "text-blue-600" 
+    {
+      label: "Total Records",
+      value: filteredRecords.length,
+      icon: Calendar,
+      color: "text-blue-600"
     },
-    { 
-      label: "Total Attendance", 
-      value: filteredRecords.reduce((sum, r) => sum + (r.total_attendance || 0), 0), 
-      icon: Users, 
-      color: "text-green-600" 
+    {
+      label: "Total Attendance",
+      value: filteredRecords.reduce((sum, r) => sum + (r.total_attendance || 0), 0),
+      icon: Users,
+      color: "text-green-600"
     },
-    { 
-      label: "Average Attendance", 
-      value: filteredRecords.length > 0 ? Math.round(filteredRecords.reduce((sum, r) => sum + (r.total_attendance || 0), 0) / filteredRecords.length) : 0, 
-      icon: UserCheck, 
-      color: "text-purple-600" 
+    {
+      label: "Average Attendance",
+      value: filteredRecords.length > 0 ? Math.round(filteredRecords.reduce((sum, r) => sum + (r.total_attendance || 0), 0) / filteredRecords.length) : 0,
+      icon: UserCheck,
+      color: "text-purple-600"
     },
-    { 
-      label: "First Timers", 
-      value: filteredRecords.reduce((sum, r) => sum + (r.first_timers || 0), 0), 
-      icon: TrendingUp, 
-      color: "text-orange-600" 
+    {
+      label: "First Timers",
+      value: filteredRecords.reduce((sum, r) => sum + (r.first_timers || 0), 0),
+      icon: TrendingUp,
+      color: "text-orange-600"
     },
   ], [filteredRecords])
 
@@ -565,15 +565,15 @@ export default function AttendanceContent() {
   const memberSearchQueryLower = useMemo(() => memberSearchQuery.toLowerCase(), [memberSearchQuery])
   const filteredMembers = useMemo(() => {
     if (!memberSearchQueryLower) return members
-    
+
     // Use for loop for better performance with large member lists
     const results: typeof members = []
     for (let i = 0; i < members.length; i++) {
       const m = members[i] as any
       const fullName = `${m.first_name} ${m.last_name}`.toLowerCase()
       if (fullName.includes(memberSearchQueryLower) ||
-          m.phone_number?.toLowerCase().includes(memberSearchQueryLower) ||
-          m.email?.toLowerCase().includes(memberSearchQueryLower)) {
+        m.phone_number?.toLowerCase().includes(memberSearchQueryLower) ||
+        m.email?.toLowerCase().includes(memberSearchQueryLower)) {
         results.push(m)
       }
     }
@@ -584,7 +584,7 @@ export default function AttendanceContent() {
   // Optimized: Pre-load all member UUIDs when members are loaded
   // Only run when members count changes, not on every render
   const membersLength = useMemo(() => members.length, [members.length])
-  
+
   useEffect(() => {
     const loadMemberUUIDs = async () => {
       if (!organization?.id || membersLength === 0) {
@@ -755,76 +755,76 @@ export default function AttendanceContent() {
             </Button>
           </div>
         </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Service Type</TableHead>
-                    <TableHead>Expected</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Actions</TableHead>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Service Type</TableHead>
+                <TableHead>Expected</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    {selectedServiceType !== "all" ? "No attendance records found for the selected service type." : "No attendance records found. Add your first record!"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{formatDate(record.date)}</TableCell>
+                    <TableCell>{record.service_type}</TableCell>
+                    <TableCell>{(record as any).expected_attendance || 0}</TableCell>
+                    <TableCell className="font-bold">{record.total_attendance}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditRecord(record)}
+                          disabled={createRecord.isPending || updateRecord.isPending || deleteRecord.isPending}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={async () => {
+                            const recordUUID = await getAttendanceRecordUUID(record.id)
+                            if (!recordUUID) {
+                              toast.error("Could not find record UUID")
+                              return
+                            }
+                            setRecordToDelete({ id: record.id, uuid: recordUUID })
+                            setDeleteDialogOpen(true)
+                          }}
+                          disabled={deleteRecord.isPending}
+                        >
+                          {deleteRecord.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredRecords.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        {selectedServiceType !== "all" ? "No attendance records found for the selected service type." : "No attendance records found. Add your first record!"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredRecords.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>{formatDate(record.date)}</TableCell>
-                        <TableCell>{record.service_type}</TableCell>
-                        <TableCell>{(record as any).expected_attendance || 0}</TableCell>
-                        <TableCell className="font-bold">{record.total_attendance}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleEditRecord(record)}
-                              disabled={createRecord.isPending || updateRecord.isPending || deleteRecord.isPending}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              onClick={async () => {
-                                const recordUUID = await getAttendanceRecordUUID(record.id)
-                                if (!recordUUID) {
-                                  toast.error("Could not find record UUID")
-                                  return
-                                }
-                                setRecordToDelete({ id: record.id, uuid: recordUUID })
-                                setDeleteDialogOpen(true)
-                              }}
-                              disabled={deleteRecord.isPending}
-                            >
-                              {deleteRecord.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -852,7 +852,7 @@ export default function AttendanceContent() {
           <SheetHeader>
             <SheetTitle>{selectedRecord ? 'Edit Record' : 'New Attendance Record'}</SheetTitle>
           </SheetHeader>
-          
+
           {/* Date and Event at the top */}
           <div className="grid gap-4 md:grid-cols-2 mt-6">
             <div className="space-y-2">
@@ -861,9 +861,9 @@ export default function AttendanceContent() {
                 date={selectedDate}
                 onSelect={(date) => {
                   setSelectedDate(date)
-                  setFormData({ 
-                    ...formData, 
-                    date: date ? date.toISOString().split('T')[0] : "" 
+                  setFormData({
+                    ...formData,
+                    date: date ? date.toISOString().split('T')[0] : ""
                   })
                 }}
                 placeholder="Select date"
@@ -873,8 +873,8 @@ export default function AttendanceContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="service_type">Event *</Label>
-              <Select 
-                value={formData.service_type} 
+              <Select
+                value={formData.service_type}
                 onValueChange={(value) => {
                   setFormData({ ...formData, service_type: value })
                   const event = eventsWithAttendance.find(e => e.name === value)
@@ -902,7 +902,7 @@ export default function AttendanceContent() {
               </Select>
             </div>
           </div>
-          
+
           <Tabs value={activeAttendanceTab} onValueChange={(v) => {
             if (v === "member-checkin" && (!formData.date || !formData.service_type || !formData.total_attendance || formData.total_attendance === "")) {
               toast.error("Please fill in the General tab first")
@@ -922,21 +922,21 @@ export default function AttendanceContent() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="expected_attendance">Expected Attendance</Label>
-                    <Input 
-                      id="expected_attendance" 
-                      type="number" 
-                      value={formData.expected_attendance} 
-                      onChange={(e) => setFormData({ ...formData, expected_attendance: e.target.value })} 
+                    <Input
+                      id="expected_attendance"
+                      type="number"
+                      value={formData.expected_attendance}
+                      onChange={(e) => setFormData({ ...formData, expected_attendance: e.target.value })}
                       disabled={createRecord.isPending || updateRecord.isPending}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="total_attendance">Total Attendance *</Label>
-                    <Input 
-                      id="total_attendance" 
-                      type="number" 
-                      value={formData.total_attendance} 
-                      onChange={(e) => setFormData({ ...formData, total_attendance: e.target.value })} 
+                    <Input
+                      id="total_attendance"
+                      type="number"
+                      value={formData.total_attendance}
+                      onChange={(e) => setFormData({ ...formData, total_attendance: e.target.value })}
                       required
                       disabled={createRecord.isPending || updateRecord.isPending}
                     />
@@ -960,31 +960,31 @@ export default function AttendanceContent() {
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label htmlFor="men">Men</Label>
-                        <Input 
-                          id="men" 
-                          type="number" 
-                          value={formData.men} 
-                          onChange={(e) => setFormData({ ...formData, men: parseInt(e.target.value) || 0 })} 
+                        <Input
+                          id="men"
+                          type="number"
+                          value={formData.men}
+                          onChange={(e) => setFormData({ ...formData, men: parseInt(e.target.value) || 0 })}
                           disabled={createRecord.isPending || updateRecord.isPending}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="women">Women</Label>
-                        <Input 
-                          id="women" 
-                          type="number" 
-                          value={formData.women} 
-                          onChange={(e) => setFormData({ ...formData, women: parseInt(e.target.value) || 0 })} 
+                        <Input
+                          id="women"
+                          type="number"
+                          value={formData.women}
+                          onChange={(e) => setFormData({ ...formData, women: parseInt(e.target.value) || 0 })}
                           disabled={createRecord.isPending || updateRecord.isPending}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="children">Children</Label>
-                        <Input 
-                          id="children" 
-                          type="number" 
-                          value={formData.children} 
-                          onChange={(e) => setFormData({ ...formData, children: parseInt(e.target.value) || 0 })} 
+                        <Input
+                          id="children"
+                          type="number"
+                          value={formData.children}
+                          onChange={(e) => setFormData({ ...formData, children: parseInt(e.target.value) || 0 })}
                           disabled={createRecord.isPending || updateRecord.isPending}
                         />
                       </div>
@@ -992,31 +992,31 @@ export default function AttendanceContent() {
 
                     <div className="space-y-2">
                       <Label htmlFor="first_timers">First Timers</Label>
-                      <Input 
-                        id="first_timers" 
-                        type="number" 
-                        value={formData.first_timers} 
-                        onChange={(e) => setFormData({ ...formData, first_timers: parseInt(e.target.value) || 0 })} 
+                      <Input
+                        id="first_timers"
+                        type="number"
+                        value={formData.first_timers}
+                        onChange={(e) => setFormData({ ...formData, first_timers: parseInt(e.target.value) || 0 })}
                         disabled={createRecord.isPending || updateRecord.isPending}
                       />
                     </div>
                   </>
                 )}
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea 
-                id="notes" 
-                value={formData.notes} 
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
-                rows={3}
-                disabled={createRecord.isPending || updateRecord.isPending}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    rows={3}
+                    disabled={createRecord.isPending || updateRecord.isPending}
+                  />
+                </div>
 
                 <div className="flex gap-2 pt-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="flex-1"
                     disabled={createRecord.isPending || updateRecord.isPending}
                   >
@@ -1029,9 +1029,9 @@ export default function AttendanceContent() {
                       selectedRecord ? "Update" : "Create"
                     )}
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => {
                       setIsSheetOpen(false)
                       resetForm()
@@ -1054,136 +1054,135 @@ export default function AttendanceContent() {
               ) : (
                 <form onSubmit={handleCombinedSave} className="space-y-4">
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="member-search">Select Members *</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={markAllAsPresent}
-                        disabled={createMemberAttendance.isPending || filteredMembers.length === 0}
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                      >
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Mark All Present
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={markAllAsAbsent}
-                        disabled={createMemberAttendance.isPending || filteredMembers.length === 0}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Mark All Absent
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearAllStatuses}
-                        disabled={createMemberAttendance.isPending || memberAttendanceStatus.size === 0}
-                      >
-                        Clear All
-                      </Button>
-                    </div>
-                  </div>
                   <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="member-search"
-                        placeholder="Search members..."
-                        value={memberSearchQuery}
-                        onChange={(e) => setMemberSearchQuery(e.target.value)}
-                        className="pl-10"
-                        disabled={createMemberAttendance.isPending}
-                      />
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={markAllAsPresent}
+                          disabled={createMemberAttendance.isPending || filteredMembers.length === 0}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Mark All Present
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={markAllAsAbsent}
+                          disabled={createMemberAttendance.isPending || filteredMembers.length === 0}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Mark All Absent
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearAllStatuses}
+                          disabled={createMemberAttendance.isPending || memberAttendanceStatus.size === 0}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
                     </div>
-                    <div className="border rounded-md overflow-hidden">
-                      <ScrollArea className="h-[400px]">
-                        <div className="p-4 space-y-2">
-                          {filteredMembers.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">No members found</p>
-                          ) : (
-                            filteredMembers.map((member: any) => {
-                              const status = getMemberStatus(member.id)
-                              return (
-                                <div
-                                  key={member.id}
-                                  className="flex items-center justify-between p-3 rounded-md border hover:bg-muted transition-colors"
-                                >
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="relative h-10 w-10 rounded-full overflow-hidden flex-shrink-0 bg-muted">
-                                      {member.photo && !member.photo.startsWith('data:') ? (
-                                        <Image
-                                          src={member.photo}
-                                          alt={`${member.first_name} ${member.last_name}`}
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      ) : (
-                                        <div className="h-full w-full flex items-center justify-center bg-muted text-muted-foreground">
-                                          <UserCheck className="h-5 w-5" />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="member-search"
+                          placeholder="Search members..."
+                          value={memberSearchQuery}
+                          onChange={(e) => setMemberSearchQuery(e.target.value)}
+                          className="pl-10"
+                          disabled={createMemberAttendance.isPending}
+                        />
+                      </div>
+                      <div className="border rounded-md overflow-hidden">
+                        <ScrollArea className="h-[400px]">
+                          <div className="p-4 space-y-2">
+                            {filteredMembers.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">No members found</p>
+                            ) : (
+                              filteredMembers.map((member: any) => {
+                                const status = getMemberStatus(member.id)
+                                return (
+                                  <div
+                                    key={member.id}
+                                    className="flex items-center justify-between p-3 rounded-md border hover:bg-muted transition-colors"
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="relative h-10 w-10 rounded-full overflow-hidden flex-shrink-0 bg-muted">
+                                        {member.photo && !member.photo.startsWith('data:') ? (
+                                          <Image
+                                            src={member.photo}
+                                            alt={`${member.first_name} ${member.last_name}`}
+                                            fill
+                                            className="object-cover"
+                                          />
+                                        ) : (
+                                          <div className="h-full w-full flex items-center justify-center bg-muted text-muted-foreground">
+                                            <UserCheck className="h-5 w-5" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <p className="text-sm font-medium truncate">
+                                        {member.first_name} {member.last_name}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                                      {status === 'present' ? (
+                                        <div className="flex items-center gap-2 text-green-600">
+                                          <CheckCircle2 className="h-5 w-5" />
                                         </div>
+                                      ) : status === 'absent' ? (
+                                        <div className="flex items-center gap-2 text-red-600">
+                                          <XCircle className="h-5 w-5" />
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setMemberStatus(member.id, 'present')}
+                                            disabled={createMemberAttendance.isPending || createRecord.isPending || updateRecord.isPending}
+                                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300"
+                                            title="Mark as Present"
+                                          >
+                                            <CheckCircle2 className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setMemberStatus(member.id, 'absent')}
+                                            disabled={createMemberAttendance.isPending || createRecord.isPending || updateRecord.isPending}
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
+                                            title="Mark as Absent"
+                                          >
+                                            <XCircle className="h-4 w-4" />
+                                          </Button>
+                                        </>
                                       )}
                                     </div>
-                                    <p className="text-sm font-medium truncate">
-                                      {member.first_name} {member.last_name}
-                                    </p>
                                   </div>
-                                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                                    {status === 'present' ? (
-                                      <div className="flex items-center gap-2 text-green-600">
-                                        <CheckCircle2 className="h-5 w-5" />
-                                      </div>
-                                    ) : status === 'absent' ? (
-                                      <div className="flex items-center gap-2 text-red-600">
-                                        <XCircle className="h-5 w-5" />
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => setMemberStatus(member.id, 'present')}
-                                          disabled={createMemberAttendance.isPending || createRecord.isPending || updateRecord.isPending}
-                                          className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300"
-                                          title="Mark as Present"
-                                        >
-                                          <CheckCircle2 className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => setMemberStatus(member.id, 'absent')}
-                                          disabled={createMemberAttendance.isPending || createRecord.isPending || updateRecord.isPending}
-                                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
-                                          title="Mark as Absent"
-                                        >
-                                          <XCircle className="h-4 w-4" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })
-                          )}
-                        </div>
-                      </ScrollArea>
+                                )
+                              })
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="checkin-notes">Notes (Optional)</Label>
-                    <Textarea 
+                    <Textarea
                       id="checkin-notes"
                       value={checkInNotes}
                       onChange={(e) => setCheckInNotes(e.target.value)}
@@ -1194,8 +1193,8 @@ export default function AttendanceContent() {
                   </div>
 
                   <div className="flex gap-2 pt-4">
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="flex-1"
                       disabled={createMemberAttendance.isPending || createRecord.isPending || updateRecord.isPending}
                     >
@@ -1211,9 +1210,9 @@ export default function AttendanceContent() {
                         </>
                       )}
                     </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => {
                         clearAllStatuses()
                         setCheckInNotes("")

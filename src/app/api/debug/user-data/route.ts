@@ -1,24 +1,39 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { verifyAuth } from "@/lib/middleware/api-auth"
+import { verifyAdmin } from "@/lib/middleware/api-auth"
 
 /**
  * GET /api/debug/user-data
  * Diagnostic endpoint to check user's session and organization data
  * Helps identify why specific users experience transaction rollback errors
+ * 
+ * SECURITY: This endpoint is admin-only and disabled in production unless
+ * ENABLE_DEBUG_ENDPOINTS environment variable is set to "true"
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(request)
-    if (authResult.error || !authResult.user) {
+    // Block debug endpoints in production unless explicitly enabled
+    const isProduction = process.env.NODE_ENV === "production"
+    const debugEnabled = process.env.ENABLE_DEBUG_ENDPOINTS === "true"
+
+    if (isProduction && !debugEnabled) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: "Debug endpoints are disabled in production" },
+        { status: 403 }
       )
     }
 
-    const { user } = authResult
+    // Require admin role for this sensitive endpoint
+    const authResult = await verifyAdmin(request)
+    if (authResult.error || !authResult.auth) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 }
+      )
+    }
+
+    const { auth } = authResult
+    const user = auth.user
     const supabase = await createClient()
 
     // Get user's session data
@@ -42,7 +57,7 @@ export async function GET(request: NextRequest) {
         .select("id, name, slug")
         .eq("id", (sessionData[0] as any).organization_id)
         .maybeSingle()
-      
+
       orgCheck = {
         exists: !!orgData,
         data: orgData,
@@ -78,9 +93,9 @@ export async function GET(request: NextRequest) {
           ...(duplicateSessions ? ["Multiple user sessions found - should be only one"] : []),
           ...(sessionData && sessionData.length > 0 && !orgCheck?.exists ? ["Organization in session does not exist"] : []),
           ...(!orgUsers || orgUsers.length === 0 ? ["User not linked to any organization"] : []),
-          ...(sessionData && sessionData.length > 0 && orgUsers && orgUsers.length > 0 && 
-              !(orgUsers as any[]).some((ou: any) => ou.organization_id === (sessionData[0] as any).organization_id) 
-              ? ["Session organization does not match any organization_users record"] : []),
+          ...(sessionData && sessionData.length > 0 && orgUsers && orgUsers.length > 0 &&
+            !(orgUsers as any[]).some((ou: any) => ou.organization_id === (sessionData[0] as any).organization_id)
+            ? ["Session organization does not match any organization_users record"] : []),
         ],
       },
     })

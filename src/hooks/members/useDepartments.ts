@@ -62,9 +62,10 @@ export function useDepartments() {
         .map((dept) => convertDepartment(dept as DBDepartment, departmentCounts.get(dept.name) || 0))
     },
     enabled: !!orgId,
-    staleTime: 15 * 60 * 1000, // 15 minutes - departments don't change often
+    staleTime: 60 * 1000, // 1 minute - departments change less often
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false, // Departments rarely change
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds for departments
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -107,8 +108,8 @@ export function useCreateDepartment() {
       toast.success("Department created successfully")
     },
     onError: (error: Error) => {
-      console.error("Failed to create department:", error)
-      toast.error(error.message || "Failed to create department")
+      console.error("Failed to update department:", error)
+      toast.error(error.message || "Failed to update department")
     },
   })
 }
@@ -124,6 +125,14 @@ export function useUpdateDepartment() {
   return useMutation({
     mutationFn: async ({ id, ...updateData }: Partial<Department> & { id: string }) => {
       if (!organization?.id) throw new Error("No organization selected")
+
+      // Get current department data to check for name change
+      const { data: currentDepartment } = await (supabase
+        .from("departments") as any)
+        .select("name")
+        .eq("id", id)
+        .eq("organization_id", organization.id)
+        .single()
 
       const dbUpdateData: Partial<DepartmentUpdate> = {}
 
@@ -145,7 +154,34 @@ export function useUpdateDepartment() {
         throw error
       }
 
-      // Get member count
+      // If name changed, update all members that have this department
+      if (currentDepartment && updateData.name && currentDepartment.name !== updateData.name) {
+        const oldName = (currentDepartment as DBDepartment).name
+        const newName = updateData.name
+
+        // Find members with old department name
+        const { data: membersToUpdate } = await (supabase
+          .from("members") as any)
+          .select("id, departments")
+          .eq("organization_id", organization.id)
+          .contains("departments", [oldName])
+
+        if (membersToUpdate && membersToUpdate.length > 0) {
+          const updates = (membersToUpdate as Pick<Member, "id" | "departments">[]).map((member) => {
+            const updatedDepartments = (member.departments || [])
+              .map((d: string) => d === oldName ? newName : d)
+
+            return (supabase
+              .from("members") as any)
+              .update({ departments: updatedDepartments })
+              .eq("id", member.id)
+          })
+
+          await Promise.all(updates)
+        }
+      }
+
+      // Get member count (using new name)
       const { data: members } = await (supabase
         .from("members") as any)
         .select("departments")
@@ -226,7 +262,7 @@ export function useDeleteDepartment() {
       queryClient.invalidateQueries({ queryKey: ["departments", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["members", organization?.id] })
       queryClient.invalidateQueries({ queryKey: ["member_statistics", organization?.id] })
-      toast.success("Department deleted successfully")
+      toast.success("Department erased successfully")
     },
     onError: (error: Error) => {
       console.error("Failed to delete department:", error)

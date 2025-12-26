@@ -68,23 +68,30 @@ export function extractSignatureFromHeader(
 }
 
 /**
- * Verify Wigal webhook signature (if they provide one)
- * Currently returns true as Wigal may not provide signatures
- * This function can be updated when signature verification is available
+ * Verify Wigal webhook signature
+ * In production: requires signature or configured IP whitelist
+ * In development: allows unsigned webhooks for testing
  */
 export function verifyWigalWebhookSignature(
   payload: string,
   headers: Record<string, string | null>
 ): boolean {
-  // TODO: Update when Wigal provides webhook signature verification
-  // For now, we'll rely on other security measures (IP whitelisting, etc.)
-  
+  const isProduction = process.env.NODE_ENV === "production"
+
   const signatureHeader = headers["x-wigal-signature"] || headers["x-signature"] || headers["signature"]
-  
+
   if (!signatureHeader) {
-    // If no signature header, log warning but allow (for backward compatibility)
-    console.warn("No webhook signature header found - this should be implemented for production")
-    return true // Allow for now, but should be false in production
+    if (isProduction) {
+      // In production, require signature or IP whitelist
+      // TODO: Add IP whitelist check here if Wigal provides static IPs
+      console.error("Webhook rejected: No signature header in production environment")
+      return false
+    }
+    // In development, allow unsigned webhooks for testing
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[DEV] Allowing unsigned webhook - this would be rejected in production")
+    }
+    return true
   }
 
   const secret = process.env.WIGAL_WEBHOOK_SECRET

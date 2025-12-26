@@ -46,8 +46,10 @@ export function useAPIConfigurations() {
       })) as APIConfiguration[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute - API configs change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -90,8 +92,10 @@ export function useActiveAPIConfiguration() {
       } as APIConfiguration
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - API configs change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -154,8 +158,8 @@ export function useCreateAPIConfiguration() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to create API configuration"
+            ? String(error.message)
+            : "Failed to create API configuration"
       toast.error(errorMessage)
     },
   })
@@ -233,8 +237,8 @@ export function useUpdateAPIConfiguration() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to update API configuration"
+            ? String(error.message)
+            : "Failed to update API configuration"
       toast.error(errorMessage)
     },
   })
@@ -273,8 +277,8 @@ export function useDeleteAPIConfiguration() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to delete API configuration"
+            ? String(error.message)
+            : "Failed to delete API configuration"
       toast.error(errorMessage)
     },
   })
@@ -325,8 +329,8 @@ export function useTestAPIConnection() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Connection test failed"
+            ? String(error.message)
+            : "Connection test failed"
       toast.error(errorMessage)
     },
   })

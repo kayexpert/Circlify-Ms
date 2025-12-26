@@ -39,9 +39,10 @@ export function useProjectIncome(projectId: string | null) {
       return (data || []) as (ProjectIncome & { members: { id: string; first_name: string; last_name: string } | null })[]
     },
     enabled: !!organization?.id && !!projectId && !orgLoading,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -97,14 +98,14 @@ export function useCreateProjectIncome() {
             hint: error?.hint,
           })
         }
-        
+
         // Create a more descriptive error message
-        const errorMessage = 
-          error?.message || 
-          error?.details || 
-          error?.hint || 
+        const errorMessage =
+          error?.message ||
+          error?.details ||
+          error?.hint ||
           (error?.code ? `Database error (code: ${error.code})` : "Failed to create project income")
-        
+
         throw new Error(errorMessage)
       }
 
@@ -125,7 +126,7 @@ export function useCreateProjectIncome() {
           // Check if contribution notifications are enabled (optimized early exit)
           // Use "Project" category to match shouldSendContributionNotification logic
           const shouldSend = await shouldSendContributionNotification(organization.id, "Project")
-          
+
           if (shouldSend) {
             // Get project name for the notification
             const { data: projectData } = await supabase
@@ -133,7 +134,7 @@ export function useCreateProjectIncome() {
               .select("name")
               .eq("id", data.project_id)
               .maybeSingle()
-            
+
             const projectName = (projectData as any)?.name || "the project"
 
             // Send notification asynchronously - don't block the UI
@@ -290,13 +291,13 @@ export function useDeleteProjectIncome() {
             hint: fetchError.hint,
           })
         }
-        
-        const errorMessage = 
-          fetchError.message || 
-          fetchError.details || 
-          fetchError.hint || 
+
+        const errorMessage =
+          fetchError.message ||
+          fetchError.details ||
+          fetchError.hint ||
           (fetchError.code ? `Database error (code: ${fetchError.code})` : "Failed to fetch project income record")
-        
+
         throw new Error(errorMessage)
       }
 
@@ -320,14 +321,14 @@ export function useDeleteProjectIncome() {
             hint: error?.hint,
           })
         }
-        
+
         // Create a more descriptive error message
-        const errorMessage = 
-          error?.message || 
-          error?.details || 
-          error?.hint || 
+        const errorMessage =
+          error?.message ||
+          error?.details ||
+          error?.hint ||
           (error?.code ? `Database error (code: ${error.code})` : "Failed to delete project income")
-        
+
         throw new Error(errorMessage)
       }
 

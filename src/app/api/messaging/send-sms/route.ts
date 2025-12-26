@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { sendSMSViaWigal, formatPhoneForWigal, type WigalSMSDestination } from "@/lib/services/wigal-sms.service"
 import { sendSMSSchema } from "@/lib/validations/schemas"
 import { verifyAuthAndOrganization } from "@/lib/middleware/api-auth"
-import { checkRateLimit, RATE_LIMITS, getRateLimitHeaders } from "@/lib/middleware/rate-limiter"
+import { checkRateLimitDB, RATE_LIMITS, getRateLimitHeaders } from "@/lib/middleware/rate-limiter"
 
 /**
  * POST /api/messaging/send-sms
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
 
     const { auth } = authResult
 
-    // Rate limiting per organization
-    const rateLimitResult = checkRateLimit(
+    // Rate limiting per organization (database-backed for serverless)
+    const rateLimitResult = await checkRateLimitDB(
       `sms:${auth.organizationId}`,
       RATE_LIMITS.SMS_SEND.maxRequests,
       RATE_LIMITS.SMS_SEND.windowMs
@@ -123,11 +123,11 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error("Error in send-sms API route:", error)
-    
+
     // Log detailed error information for debugging
     const errorMessage = error instanceof Error ? error.message : "Internal server error"
     const errorStack = error instanceof Error ? error.stack : undefined
-    
+
     // Capture in Sentry if available
     try {
       const Sentry = await import("@sentry/nextjs")
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     } catch {
       // Sentry not available, continue without it
     }
-    
+
     return NextResponse.json(
       {
         success: false,

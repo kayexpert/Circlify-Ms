@@ -38,8 +38,10 @@ export function useEventTypes() {
       return (data || []) as EventType[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute - event types change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -83,8 +85,8 @@ export function useCreateEventType() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to create event type"
+            ? String(error.message)
+            : "Failed to create event type"
       toast.error(errorMessage)
     },
   })
@@ -127,8 +129,8 @@ export function useUpdateEventType() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to update event type"
+            ? String(error.message)
+            : "Failed to update event type"
       toast.error(errorMessage)
     },
   })
@@ -167,8 +169,8 @@ export function useDeleteEventType() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to delete event type"
+            ? String(error.message)
+            : "Failed to delete event type"
       toast.error(errorMessage)
     },
   })

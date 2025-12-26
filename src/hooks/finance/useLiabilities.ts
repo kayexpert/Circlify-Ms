@@ -23,10 +23,10 @@ export function useLiabilities(enabled: boolean = true) {
       if (!organization?.id) return []
 
       // Select only the fields we need for display and operations
-      const { data, error } = await         supabase
-          .from("finance_liabilities")
-          .select("id, date, category, description, creditor, original_amount, amount_paid, balance, status, is_loan, linked_income_record_id, interest_rate, loan_start_date, loan_end_date, loan_duration_days, amount_received, created_at")
-          .eq("organization_id", organization.id)
+      const { data, error } = await supabase
+        .from("finance_liabilities")
+        .select("id, date, category, description, creditor, original_amount, amount_paid, balance, status, is_loan, linked_income_record_id, interest_rate, loan_start_date, loan_end_date, loan_duration_days, amount_received, created_at")
+        .eq("organization_id", organization.id)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(500) // Limit to recent records for performance
@@ -39,9 +39,10 @@ export function useLiabilities(enabled: boolean = true) {
       return (data || []).map(convertLiability)
     },
     enabled: enabled && !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false, // Reduce unnecessary refetches
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -68,7 +69,7 @@ export function useLiabilitiesPaginated(page: number = 1, pageSize: number = 20,
         .from("finance_liabilities")
         .select("id, date, category, description, creditor, original_amount, amount_paid, balance, status, is_loan, linked_income_record_id, interest_rate, loan_start_date, loan_end_date, loan_duration_days, amount_received, created_at")
         .eq("organization_id", organization.id)
-      
+
       let countQuery = supabase
         .from("finance_liabilities")
         .select("*", { count: "exact", head: true })
@@ -102,34 +103,34 @@ export function useLiabilitiesPaginated(page: number = 1, pageSize: number = 20,
             .from("finance_liabilities")
             .select("id, date, category, description, creditor, original_amount, amount_paid, balance, status, created_at")
             .eq("organization_id", organization.id)
-          
+
           if (isLoan !== undefined) {
             // Can't filter by is_loan if column doesn't exist, so return all
             console.warn("Cannot filter by is_loan - column does not exist. Returning all liabilities.")
           }
-          
+
           const fallbackResult = await fallbackQuery
             .order("date", { ascending: false })
             .order("created_at", { ascending: false })
             .range(from, to)
-          
+
           if (fallbackResult.error) {
             throw fallbackResult.error
           }
-          
+
           // Also retry count query without the filter
           let fallbackCountQuery = supabase
             .from("finance_liabilities")
             .select("*", { count: "exact", head: true })
             .eq("organization_id", organization.id)
-          
+
           const fallbackCountResult = await fallbackCountQuery
           if (fallbackCountResult.error) {
             console.error("Error fetching count:", fallbackCountResult.error)
             // If count also fails, use data length as fallback
             const total = fallbackResult.data?.length || 0
             const totalPages = Math.ceil(total / pageSize)
-            
+
             return {
               data: (fallbackResult.data || []).map(convertLiability),
               total,
@@ -138,10 +139,10 @@ export function useLiabilitiesPaginated(page: number = 1, pageSize: number = 20,
               totalPages,
             }
           }
-          
+
           const total = fallbackCountResult.count || 0
           const totalPages = Math.ceil(total / pageSize)
-          
+
           return {
             data: (fallbackResult.data || []).map(convertLiability),
             total,
@@ -152,14 +153,14 @@ export function useLiabilitiesPaginated(page: number = 1, pageSize: number = 20,
         }
         throw dataResult.error
       }
-      
+
       // Also check count query error
       if (countResult.error) {
         console.error("Error fetching liabilities count:", countResult.error)
         // If count fails but data succeeded, use data length as fallback
         const total = dataResult.data?.length || 0
         const totalPages = Math.ceil(total / pageSize)
-        
+
         return {
           data: (dataResult.data || []).map(convertLiability),
           total,
@@ -181,9 +182,10 @@ export function useLiabilitiesPaginated(page: number = 1, pageSize: number = 20,
       }
     },
     enabled: enabled && !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -262,10 +264,10 @@ export function useUpdateLiability() {
       if (!organization?.id) throw new Error("No organization selected")
 
       const dbUpdateData: Partial<FinanceLiabilityUpdate> = {}
-      
+
       if (updateData.date) {
-        dbUpdateData.date = updateData.date instanceof Date 
-          ? updateData.date.toISOString().split("T")[0] 
+        dbUpdateData.date = updateData.date instanceof Date
+          ? updateData.date.toISOString().split("T")[0]
           : updateData.date
       }
       if (updateData.category) dbUpdateData.category = updateData.category
@@ -450,8 +452,9 @@ export function useLiability(liabilityId: string | null) {
       return data ? convertLiability(data) : null
     },
     enabled: !!organization?.id && !!liabilityId && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -488,7 +491,9 @@ export function useLiabilityPayments(liabilityId: string | null) {
       }))
     },
     enabled: !!organization?.id && !!liabilityId && !orgLoading,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -522,21 +527,21 @@ export function useCreateLoan() {
     }) => {
       if (!organization?.id) throw new Error("No organization selected")
 
-      const dateStr = loanData.date instanceof Date 
-        ? loanData.date.toISOString().split("T")[0] 
+      const dateStr = loanData.date instanceof Date
+        ? loanData.date.toISOString().split("T")[0]
         : loanData.date
 
-      const startDateStr = loanData.startDate 
+      const startDateStr = loanData.startDate
         ? (loanData.startDate instanceof Date ? loanData.startDate.toISOString().split("T")[0] : loanData.startDate)
         : null
 
-      const endDateStr = loanData.endDate 
+      const endDateStr = loanData.endDate
         ? (loanData.endDate instanceof Date ? loanData.endDate.toISOString().split("T")[0] : loanData.endDate)
         : null
 
       // Use a transaction-like approach: create income first, then liability
       // If liability creation fails, we'll need to clean up the income record
-      
+
       // Step 1: Create income record (money received - amountReceived)
       const { data: incomeRecord, error: incomeError } = await supabase
         .from("finance_income_records")

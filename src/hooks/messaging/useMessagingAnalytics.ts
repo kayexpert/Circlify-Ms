@@ -63,21 +63,21 @@ export function useMessagingAnalytics(dateRange?: { start: Date; end: Date }) {
       const messagesData = (messages || []) as any[]
 
       if (!messagesData || messagesData.length === 0) {
-      return {
-        totalMessages: 0,
-        sentMessages: 0,
-        failedMessages: 0,
-        totalCost: 0,
-        totalRecipients: 0,
-        averageCostPerMessage: 0,
-        messagesByStatus: {
-          Sent: 0,
-          Failed: 0,
-          Draft: 0,
-        },
-        messagesByMonth: [],
-        topTemplates: [],
-      } as MessagingAnalytics
+        return {
+          totalMessages: 0,
+          sentMessages: 0,
+          failedMessages: 0,
+          totalCost: 0,
+          totalRecipients: 0,
+          averageCostPerMessage: 0,
+          messagesByStatus: {
+            Sent: 0,
+            Failed: 0,
+            Draft: 0,
+          },
+          messagesByMonth: [],
+          topTemplates: [],
+        } as MessagingAnalytics
       }
 
       // Calculate statistics
@@ -170,8 +170,10 @@ export function useMessagingAnalytics(dateRange?: { start: Date; end: Date }) {
       } as MessagingAnalytics
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - for real-time updates
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -216,7 +218,7 @@ export function useMessagingBalance() {
           } else if (data.message) {
             errorMessage = data.message
           }
-          
+
           // Log detailed error for debugging
           console.error("Failed to fetch balance:", {
             status: response.status,
@@ -224,16 +226,16 @@ export function useMessagingBalance() {
             code: data.code,
             fullResponse: data,
           })
-          
+
           // If it's an authorization error, the API key might be invalid
           const errorMessageLower = errorMessage.toLowerCase()
-          if (response.status === 401 || 
-              errorMessageLower.includes("unauthorized") || 
-              errorMessageLower.includes("not authorized") ||
-              errorMessageLower.includes("authorization")) {
+          if (response.status === 401 ||
+            errorMessageLower.includes("unauthorized") ||
+            errorMessageLower.includes("not authorized") ||
+            errorMessageLower.includes("authorization")) {
             console.warn("Wigal API authorization failed. Please check your API key and sender ID in the Configuration tab.")
           }
-          
+
           // Return null instead of throwing to allow UI to show appropriate message
           return null
         }
@@ -246,8 +248,9 @@ export function useMessagingBalance() {
       }
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000, // 2 minutes - balance changes frequently
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 60 * 1000, // Refetch every 1 minute - balance changes frequently
+    refetchOnWindowFocus: true, // Refetch on window focus
     retry: 1, // Only retry once on failure
   })
 }

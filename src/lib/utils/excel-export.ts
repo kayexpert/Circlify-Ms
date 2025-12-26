@@ -174,3 +174,69 @@ export function parseExcelFile(file: File): Promise<Array<Record<string, any>>> 
   })
 }
 
+/**
+ * Generate a sample Excel file for child import
+ */
+export function generateChildSampleExcel(): void {
+  const headers = [
+    'first_name',
+    'last_name',
+    'phone_number',
+    'gender',
+    'date_of_birth',
+    'photo',
+    'mother_name',
+    'father_name',
+    'guardian_name',
+    'guardian_relationship',
+    'medical_info',
+    'allergies',
+    'special_needs',
+    'emergency_contact_name',
+    'emergency_contact_phone',
+    'enrolled_date',
+    'status',
+    'class_group',
+    'notes'
+  ]
+
+  // Create sample data row
+  const sampleData = [
+    [
+      'Sam',
+      'Doe',
+      '0244123456',
+      'Male',
+      '2015-05-10',
+      '',
+      'Jane Doe',
+      'John Doe',
+      '',
+      '',
+      'None',
+      'Peanuts',
+      'None',
+      'Jane Doe',
+      '0201234567',
+      '2024-01-01',
+      'active',
+      'Elementary',
+      'Sample child notes'
+    ]
+  ]
+
+  // Create workbook
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData])
+
+  // Set column widths
+  const colWidths = headers.map(() => ({ wch: 20 }))
+  ws['!cols'] = colWidths
+
+  // Add worksheet to workbook
+  XLSX.utils.book_append_sheet(wb, ws, 'Children')
+
+  // Generate file and download
+  XLSX.writeFile(wb, 'child-import-template.xlsx')
+}
+

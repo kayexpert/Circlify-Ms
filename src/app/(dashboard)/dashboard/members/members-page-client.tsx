@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LayoutDashboard, Users, UserPlus, CalendarDays, Cake, Network, MessageSquare } from "lucide-react"
 import { CompactLoader } from "@/components/ui/loader"
+import { useMembersRealtime, useAttendanceRealtime } from "@/hooks/use-realtime-subscription"
 
 // Lazy load tab components - only load when needed
 const OverviewContent = lazy(() => import("./OverviewContent").then(m => ({ default: m.default })))
@@ -23,6 +24,10 @@ export function MembersPageClient() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState<string>(tabParam && VALID_TABS.includes(tabParam as any) ? tabParam : "overview")
+
+  // Enable real-time subscriptions for live updates
+  useMembersRealtime()
+  useAttendanceRealtime()
 
   // Update tab when URL parameter changes - memoized to prevent unnecessary updates
   useEffect(() => {

@@ -61,19 +61,23 @@ export async function verifyAuthAndOrganization(request: NextRequest): Promise<{
       }
     }
 
-    console.log("[API Auth] Verifying auth for user:", user.id)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[API Auth] Verifying auth for user:", user.id)
+    }
 
     // Use optimized query function that handles both session and role
     // This avoids potential transaction conflicts from multiple separate queries
     const { getUserSessionAndRole } = await import("@/lib/supabase/optimized-queries")
     const sessionAndRole = await getUserSessionAndRole(user.id)
-    
-    console.log("[API Auth] Session and role query completed:", {
-      hasSession: !!sessionAndRole?.session,
-      hasRole: !!sessionAndRole?.role,
-      organizationId: sessionAndRole?.organizationId,
-    })
-    
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[API Auth] Session and role query completed:", {
+        hasSession: !!sessionAndRole?.session,
+        hasRole: !!sessionAndRole?.role,
+        organizationId: sessionAndRole?.organizationId,
+      })
+    }
+
     if (!sessionAndRole?.session) {
       console.error("[API Auth] No session found for user:", user.id)
       return {
@@ -84,7 +88,7 @@ export async function verifyAuthAndOrganization(request: NextRequest): Promise<{
         ),
       }
     }
-    
+
     if (!sessionAndRole?.role) {
       console.error("[API Auth] No role found for user:", user.id)
       return {
@@ -95,12 +99,12 @@ export async function verifyAuthAndOrganization(request: NextRequest): Promise<{
         ),
       }
     }
-    
+
     const sessionResult = {
       data: sessionAndRole.session,
       error: null,
     }
-    
+
     const roleResult = {
       data: {
         role: sessionAndRole.role,
@@ -108,12 +112,13 @@ export async function verifyAuthAndOrganization(request: NextRequest): Promise<{
       },
       error: null,
     }
-    
-    if (roleResult.data) {
+
+    if (roleResult.data && process.env.NODE_ENV === "development") {
+      const roleData = roleResult.data as { role: string; organization_id: string }
       console.log("[API Auth] Role query result:", {
         hasData: true,
-        role: (roleResult.data as any)?.role,
-        organizationId: (roleResult.data as any)?.organization_id,
+        role: roleData.role,
+        organizationId: roleData.organization_id,
       })
     }
 

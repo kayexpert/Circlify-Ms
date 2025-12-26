@@ -4,14 +4,15 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CalendarDays, DollarSign, MessageSquare, Package, BarChart3, Settings, FolderKanban } from "lucide-react"
+import { LayoutDashboard, Users, CalendarDays, DollarSign, MessageSquare, Package, BarChart3, Settings, FolderKanban, Baby } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSidebarStore } from "@/lib/store"
 import { useOrganization } from "@/hooks/use-organization"
 
-const menuItems = [
+// Base menu items available to all organizations
+const baseMenuItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -22,6 +23,19 @@ const menuItems = [
     href: "/dashboard/members",
     icon: Users,
   },
+]
+
+// Church-only menu items
+const churchMenuItems = [
+  {
+    title: "Kidz Church",
+    href: "/dashboard/children",
+    icon: Baby,
+  },
+]
+
+// Common menu items for all organizations (after church-specific ones)
+const commonMenuItems = [
   {
     title: "Finance",
     href: "/dashboard/finance",
@@ -71,7 +85,7 @@ export function Sidebar() {
     }
 
     window.addEventListener('organizationUpdated', handleOrganizationUpdate)
-    
+
     return () => {
       window.removeEventListener('organizationUpdated', handleOrganizationUpdate)
     }
@@ -93,50 +107,60 @@ export function Sidebar() {
             </div>
           ) : (
             <div className="text-2xl flex-shrink-0 mx-auto">⛪</div>
-            )}
+          )}
         </div>
 
         <ScrollArea className="h-[calc(100vh-4rem)] px-3 py-4">
           <TooltipProvider>
-          <nav className="space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon
-              // For Dashboard, only match exactly. For other items, match exactly or as a child route
-              const isActive = item.href === "/dashboard" 
-                ? pathname === item.href || pathname === item.href + "/"
-                : pathname === item.href || pathname.startsWith(item.href + "/")
-              
-                const linkContent = (
-                  <Link 
-                    key={item.href} 
-                    href={item.href} 
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-base mb-1 transition-colors cursor-pointer", 
-                      isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground", 
-                      !isOpen && "justify-center"
-                    )}
-                  >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {isOpen && <span>{item.title}</span>}
-                </Link>
-              )
+            <nav className="space-y-2">
+              {(() => {
+                // Build menu items based on organization type
+                const isChurch = organization?.type?.trim().toLowerCase() === 'church'
+                const menuItems = [
+                  ...baseMenuItems,
+                  ...(isChurch ? churchMenuItems : []),
+                  ...commonMenuItems,
+                ]
 
-                if (!isOpen) {
-                  return (
-                    <Tooltip key={item.href}>
-                      <TooltipTrigger asChild>
-                        {linkContent}
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <p>{item.title}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                return menuItems.map((item) => {
+                  const Icon = item.icon
+                  // For Dashboard, only match exactly. For other items, match exactly or as a child route
+                  const isActive = item.href === "/dashboard"
+                    ? pathname === item.href || pathname === item.href + "/"
+                    : pathname === item.href || pathname.startsWith(item.href + "/")
+
+                  const linkContent = (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-base mb-1 transition-colors cursor-pointer",
+                        isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        !isOpen && "justify-center"
+                      )}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {isOpen && <span>{item.title}</span>}
+                    </Link>
                   )
-                }
 
-                return linkContent
-            })}
-          </nav>
+                  if (!isOpen) {
+                    return (
+                      <Tooltip key={item.href}>
+                        <TooltipTrigger asChild>
+                          {linkContent}
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p>{item.title}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  }
+
+                  return linkContent
+                })
+              })()}
+            </nav>
           </TooltipProvider>
         </ScrollArea>
       </aside>

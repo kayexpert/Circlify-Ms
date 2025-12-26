@@ -37,17 +37,18 @@ import { Pagination } from "@/components/ui/pagination"
 import { toast } from "sonner"
 import type { Member } from "./types"
 import type { IncomeRecord } from "@/app/(dashboard)/dashboard/finance/types"
+import { SpouseAutocomplete } from "@/components/members/SpouseAutocomplete"
 
 // Ensure we're using the correct Member type from members module
 type MembersModuleMember = Member
 
 // Memoized Member Card component to prevent unnecessary re-renders
 // Optimized for large lists with better memoization
-const MemberCard = React.memo(({ 
-  member, 
+const MemberCard = React.memo(({
+  member,
   onClick,
   onHover
-}: { 
+}: {
   member: Member
   onClick: (member: Member) => void
   onHover?: (memberId: string) => void
@@ -73,13 +74,13 @@ const MemberCard = React.memo(({
   }, [member.first_name, member.last_name])
 
   const badgeClassName = useMemo(() => {
-    return member.membership_status === "active" 
-      ? "bg-green-500 hover:bg-green-600" 
+    return member.membership_status === "active"
+      ? "bg-green-500 hover:bg-green-600"
       : "bg-red-500 hover:bg-red-600"
   }, [member.membership_status])
 
   return (
-    <Card 
+    <Card
       className="relative overflow-hidden border-0 border-l-0 border-r-0 border-b-0 border-t-4 cursor-pointer shadow-sm hover:shadow-lg transition-shadow"
       style={{ borderTopColor: '#14b8a6' } as React.CSSProperties}
       onClick={handleClick}
@@ -87,10 +88,10 @@ const MemberCard = React.memo(({
     >
       <div className="relative w-full aspect-square bg-muted flex items-center justify-center">
         {member.photo && !member.photo.startsWith('data:') ? (
-          <Image 
-            src={member.photo} 
-            alt={`${member.first_name} ${member.last_name}`} 
-            fill 
+          <Image
+            src={member.photo}
+            alt={`${member.first_name} ${member.last_name}`}
+            fill
             className="object-cover object-top"
             loading="lazy"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 20vw, 16vw"
@@ -108,7 +109,7 @@ const MemberCard = React.memo(({
         </p>
       </div>
       {member.membership_status && (
-        <Badge 
+        <Badge
           className={`absolute top-2 right-2 text-white text-xs rounded-sm ${badgeClassName}`}
         >
           {member.membership_status}
@@ -211,7 +212,7 @@ const MultiSelect = React.memo(function MultiSelect({
                         onMouseDown={(e) => e.preventDefault()}
                       >
                         <X className="h-3 w-3" />
-            </span>
+                      </span>
                     </Badge>
                   )
                 })
@@ -229,7 +230,7 @@ const MultiSelect = React.memo(function MultiSelect({
                     {setupMessage || `No ${label.toLowerCase()} available`}
                   </p>
                   {setupLink && (
-                    <Link 
+                    <Link
                       href={setupLink}
                       onClick={() => setOpen(false)}
                       className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 underline transition-colors"
@@ -266,8 +267,8 @@ const MultiSelect = React.memo(function MultiSelect({
   // Only re-render if options, selected, or callbacks change
   return (
     prevProps.options.length === nextProps.options.length &&
-    prevProps.options.every((opt, idx) => 
-      opt.value === nextProps.options[idx]?.value && 
+    prevProps.options.every((opt, idx) =>
+      opt.value === nextProps.options[idx]?.value &&
       opt.label === nextProps.options[idx]?.label
     ) &&
     prevProps.selected.length === nextProps.selected.length &&
@@ -322,11 +323,11 @@ export default function MembersContent() {
   // Throttled to prevent excessive prefetching
   const handleMemberHover = useCallback((memberId: string) => {
     if (!organization?.id || !memberId) return
-    
+
     // Check if already cached to avoid unnecessary prefetch
     const cached = queryClient.getQueryData(["members", organization.id, memberId])
     if (cached) return
-    
+
     // Prefetch full member data when hovering over a card
     // This makes the drawer open instantly with all data already cached
     queryClient.prefetchQuery({
@@ -347,7 +348,7 @@ export default function MembersContent() {
               memberId,
               organizationId: organization.id,
             }
-            
+
             // Safely extract error properties
             let hasErrorProperties = false
             if (error && typeof error === 'object' && error !== null) {
@@ -395,7 +396,7 @@ export default function MembersContent() {
               errorInfo.error = String(error)
               hasErrorProperties = true
             }
-            
+
             // Only log if we have meaningful error information
             if (hasErrorProperties) {
               console.error("Error prefetching member:", errorInfo)
@@ -433,7 +434,9 @@ export default function MembersContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
-  
+  const [paymentCategoryFilter, setPaymentCategoryFilter] = useState("all")
+  const [attendanceEventTypeFilter, setAttendanceEventTypeFilter] = useState("all")
+
   // Debounce search input to reduce filter operations
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -483,7 +486,7 @@ export default function MembersContent() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [activeTab, setActiveTab] = useState("bio")
-  
+
   // Follow-up form state
   const [followUpForm, setFollowUpForm] = useState<{
     date: Date | undefined
@@ -507,10 +510,10 @@ export default function MembersContent() {
     if (!selectedMember || !selectedMemberUUID || allMembers.length === 0 || !isSheetOpen) {
       return
     }
-    
+
     const refreshedMember = allMembers.find(m => m.uuid === selectedMemberUUID)
     if (!refreshedMember) return
-    
+
     // Check if any fields have changed by comparing key fields
     // Use shallow comparison for arrays to avoid expensive JSON.stringify
     const groupsChanged = (refreshedMember as any).groups?.length !== (selectedMember as any).groups?.length ||
@@ -519,15 +522,15 @@ export default function MembersContent() {
       (refreshedMember as any).departments?.some((d: string, i: number) => d !== (selectedMember as any).departments?.[i])
     const rolesChanged = (refreshedMember as any).roles?.length !== (selectedMember as any).roles?.length ||
       (refreshedMember as any).roles?.some((r: string, i: number) => r !== (selectedMember as any).roles?.[i])
-    
-    const hasChanges = 
+
+    const hasChanges =
       refreshedMember.first_name !== selectedMember.first_name ||
       refreshedMember.last_name !== selectedMember.last_name ||
       refreshedMember.photo !== selectedMember.photo ||
       groupsChanged ||
       departmentsChanged ||
       rolesChanged
-    
+
     if (hasChanges) {
       // Update selectedMember with fresh data
       setSelectedMember(refreshedMember as Member)
@@ -548,18 +551,18 @@ export default function MembersContent() {
 
   // Income records - only load when payment tab is active to improve initial load time
   const shouldLoadIncomeRecords = activeTab === "payments" && selectedMember !== null
-  
+
   // Fetch member attendance and follow-ups when member is selected and on relevant tabs
   // Use selectedMemberUUID directly (it's already set when member is clicked)
   const memberUUIDForHooks = selectedMemberUUID
-  
+
   const { data: memberAttendanceRecords = [] } = useMemberAttendanceRecords(
     (activeTab === "attendance" && memberUUIDForHooks) ? memberUUIDForHooks : null
   )
   const { data: memberFollowUps = [] } = useMemberFollowUps(
     (activeTab === "followup" && memberUUIDForHooks) ? memberUUIDForHooks : null
   )
-  
+
   // Mutations for follow-ups
   const createFollowUp = useCreateMemberFollowUp()
   const updateFollowUp = useUpdateMemberFollowUp()
@@ -577,7 +580,7 @@ export default function MembersContent() {
     if (!searchQueryLower && filterStatus === "all") {
       return allMembers // Early return for no filters
     }
-    
+
     return allMembers.filter((member): member is Member => {
       // Only compute search text if needed
       if (searchQueryLower) {
@@ -586,12 +589,12 @@ export default function MembersContent() {
           return false
         }
       }
-      
+
       // Status filter
       if (filterStatus !== "all" && member.membership_status !== filterStatus) {
         return false
       }
-      
+
       return true
     })
   }, [allMembers, searchQueryLower, filterStatus])
@@ -616,18 +619,18 @@ export default function MembersContent() {
     if (!selectedMember) return ""
     return `${selectedMember.first_name} ${selectedMember.last_name}`.toLowerCase().trim()
   }, [selectedMember?.first_name, selectedMember?.last_name])
-  
+
   const memberContributions = useMemo(() => {
     if (!selectedMember || activeTab !== "payments" || incomeRecords.length === 0) return []
-    
+
     const memberId = selectedMember.id
-    
+
     return incomeRecords.filter((record) => {
       // Primary match: by memberId (if both exist and match) - fastest check
       if (record.memberId && memberId && record.memberId === memberId) {
         return true
       }
-      
+
       // Secondary match: by member name (case-insensitive, with multiple formats)
       if (record.memberName && memberFullNameLower) {
         const recordMemberNameLower = record.memberName.toLowerCase().trim()
@@ -640,17 +643,23 @@ export default function MembersContent() {
           return true
         }
       }
-      
+
       return false
     })
   }, [incomeRecords, selectedMember, activeTab, memberFullNameLower])
+
+  // Filtered contributions based on category
+  const filteredContributions = useMemo(() => {
+    if (paymentCategoryFilter === "all") return memberContributions
+    return memberContributions.filter(r => r.category === paymentCategoryFilter)
+  }, [memberContributions, paymentCategoryFilter])
 
   // Calculate contribution stats - only when payments tab is active
   const contributionStats = useMemo(() => {
     if (activeTab !== "payments" || memberContributions.length === 0) {
       return { total: 0, thisYear: 0 }
     }
-    
+
     const total = memberContributions.reduce((sum, record) => sum + (record.amount || 0), 0)
     const currentYear = new Date().getFullYear()
     const thisYear = memberContributions
@@ -659,7 +668,7 @@ export default function MembersContent() {
         return recordDate.getFullYear() === currentYear
       })
       .reduce((sum, record) => sum + (record.amount || 0), 0)
-    
+
     return { total, thisYear }
   }, [memberContributions, activeTab])
 
@@ -701,12 +710,12 @@ export default function MembersContent() {
   const handleMemberClick = useCallback(async (member: Member) => {
     // Open drawer IMMEDIATELY for instant feedback
     setIsSheetOpen(true)
-    
+
     // Set basic member data immediately
     setSelectedMember(member)
     setSelectedMemberUUID(member.uuid || null)
     setActiveTab("bio")
-    
+
     // Try to get prefetched full member data from cache first
     // If not available, use the member object from list (may have limited fields)
     let fullMember: Member | null = null
@@ -718,38 +727,38 @@ export default function MembersContent() {
         // If not cached, fetch it quickly in background
         // Don't await - let it populate cache for next time
         const supabase = createClient()
-        ;(async () => {
-          try {
-            const { data, error } = await (supabase
-              .from("members") as any)
-              .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles, created_at, updated_at")
-              .eq("id", member.uuid)
-              .eq("organization_id", organization.id)
-              .single()
+          ; (async () => {
+            try {
+              const { data, error } = await (supabase
+                .from("members") as any)
+                .select("id, first_name, last_name, middle_name, email, phone_number, secondary_phone, photo, membership_status, join_date, gender, date_of_birth, marital_status, spouse_name, number_of_children, occupation, address, city, town, region, digital_address, notes, groups, departments, roles, created_at, updated_at")
+                .eq("id", member.uuid)
+                .eq("organization_id", organization.id)
+                .single()
 
-            if (!error && data) {
-              fullMember = convertMember(data)
-              // Cache it for future use
-              queryClient.setQueryData(["members", organization.id, member.uuid], fullMember)
-              // Update selectedMember if drawer is still open
-              if (isSheetOpen) {
-                setSelectedMember(fullMember)
+              if (!error && data) {
+                fullMember = convertMember(data)
+                // Cache it for future use
+                queryClient.setQueryData(["members", organization.id, member.uuid], fullMember)
+                // Update selectedMember if drawer is still open
+                if (isSheetOpen) {
+                  setSelectedMember(fullMember)
+                }
               }
+            } catch (error) {
+              console.error("Error fetching full member data:", error)
             }
-          } catch (error) {
-            console.error("Error fetching full member data:", error)
-          }
-        })()
+          })()
       }
     }
-    
+
     // Use full member data if available, otherwise fall back to list member data
     const memberToUse = fullMember || member
-    
+
     // Set form data with all available fields
     const joinDateObj = memberToUse.join_date ? new Date(memberToUse.join_date + "T00:00:00") : undefined
     const dobObj = memberToUse.date_of_birth ? new Date(memberToUse.date_of_birth + "T00:00:00") : undefined
-    
+
     startTransition(() => {
       setFormData({
         first_name: memberToUse.first_name || "",
@@ -780,7 +789,7 @@ export default function MembersContent() {
       setJoinDate(joinDateObj && !isNaN(joinDateObj.getTime()) ? joinDateObj : undefined)
       setPhotoPreview(memberToUse.photo || null)
       setFormErrors({})
-      
+
       // Update selectedMember with full data if we fetched it
       if (fullMember) {
         setSelectedMember(fullMember)
@@ -805,7 +814,7 @@ export default function MembersContent() {
     // Validate file
     const { validateImageFile, PROFILE_PHOTO_OPTIONS } = await import('@/lib/utils/image-compression')
     const validation = validateImageFile(file, 10) // Max 10MB before compression
-    
+
     if (!validation.isValid) {
       toast.error(validation.error || 'Invalid image file')
       // Reset file input
@@ -817,7 +826,7 @@ export default function MembersContent() {
 
     try {
       setIsUploadingPhoto(true)
-      
+
       // Delete old photo if it exists (when updating existing member)
       const oldPhotoUrl = selectedMember?.photo || photoPreview
       if (oldPhotoUrl && typeof oldPhotoUrl === 'string' && !oldPhotoUrl.startsWith('data:')) {
@@ -832,11 +841,11 @@ export default function MembersContent() {
           console.error('Error deleting old photo:', deleteError)
         }
       }
-      
+
       // Compress image aggressively for profile photos
       const { compressImage } = await import('@/lib/utils/image-compression')
       const compressedFile = await compressImage(file, PROFILE_PHOTO_OPTIONS)
-      
+
       // Upload compressed file to Supabase Storage
       const uploadFormData = new FormData()
       uploadFormData.append('file', compressedFile)
@@ -855,12 +864,12 @@ export default function MembersContent() {
 
       // Store the storage URL in photoPreview
       setPhotoPreview(uploadResult.url)
-      
+
       // Show compression info
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2)
       const compressedSizeKB = (compressedFile.size / 1024).toFixed(2)
       const compressionRatio = parseFloat(uploadResult.compressionRatio?.replace('%', '') || '0')
-      const compressionMessage = compressionRatio > 0.1 
+      const compressionMessage = compressionRatio > 0.1
         ? `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB (${uploadResult.compressionRatio} reduction)`
         : `Image optimized: ${originalSizeMB}MB → ${compressedSizeKB}KB`
       toast.success(compressionMessage)
@@ -888,7 +897,7 @@ export default function MembersContent() {
   // Validation function
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
-    
+
     if (!formData.first_name.trim()) {
       errors.first_name = "First name is required"
     }
@@ -909,7 +918,7 @@ export default function MembersContent() {
     if (formData.number_of_children && (isNaN(Number(formData.number_of_children)) || Number(formData.number_of_children) < 0)) {
       errors.number_of_children = "Please enter a valid number"
     }
-    
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -970,16 +979,16 @@ export default function MembersContent() {
           id: selectedMemberUUID,
           ...memberData,
         } as Partial<Member> & { id: string })
-        
+
         // Immediately update selectedMember and form data with the mutation result
         // This ensures the UI updates right away without waiting for refetch
         if (updatedMember) {
           const updatedMemberTyped = updatedMember as Member
-          
+
           // Update React Query cache for both paginated and individual member queries
           if (organization?.id) {
             queryClient.setQueryData(["members", organization.id, selectedMemberUUID], updatedMemberTyped)
-            
+
             // Also update the paginated list cache if this member is in the current page
             queryClient.setQueryData(
               ["members", "paginated", organization.id, currentPage, pageSize],
@@ -987,20 +996,20 @@ export default function MembersContent() {
                 if (!oldData?.data) return oldData
                 return {
                   ...oldData,
-                  data: oldData.data.map((m: Member) => 
+                  data: oldData.data.map((m: Member) =>
                     m.uuid === selectedMemberUUID ? updatedMemberTyped : m
                   ),
                 }
               }
             )
           }
-          
+
           setSelectedMember(updatedMemberTyped)
-          
+
           // Update form data with all latest data to ensure consistency
           const joinDateObj = updatedMemberTyped.join_date ? new Date(updatedMemberTyped.join_date + "T00:00:00") : undefined
           const dobObj = updatedMemberTyped.date_of_birth ? new Date(updatedMemberTyped.date_of_birth + "T00:00:00") : undefined
-          
+
           setFormData({
             first_name: updatedMemberTyped.first_name || "",
             last_name: updatedMemberTyped.last_name || "",
@@ -1035,8 +1044,8 @@ export default function MembersContent() {
       } else {
         // Create new member
         await createMember.mutateAsync(memberData)
-      setIsSheetOpen(false)
-      resetForm()
+        setIsSheetOpen(false)
+        resetForm()
       }
     } catch (error) {
       // Error is already handled by the hook (toast)
@@ -1072,11 +1081,11 @@ export default function MembersContent() {
         <div className="flex gap-3 flex-1">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search members" 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-              className="pl-10" 
+            <Input
+              placeholder="Search members"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
           </div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -1113,7 +1122,7 @@ export default function MembersContent() {
           </div>
         ) : (
           filteredMembers.map((member) => (
-            <MemberCard 
+            <MemberCard
               key={member.id}
               member={member}
               onClick={handleMemberClick}
@@ -1144,8 +1153,8 @@ export default function MembersContent() {
 
       {/* Member Form Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent 
-          className="w-full sm:max-w-3xl flex flex-col h-full max-h-screen" 
+        <SheetContent
+          className="w-full sm:max-w-3xl flex flex-col h-full max-h-screen"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <SheetHeader className="pb-6 flex-shrink-0">
@@ -1158,8 +1167,8 @@ export default function MembersContent() {
             <div className="px-2 py-2">
               <div className="mb-5">
                 <div className="flex items-center gap-6">
-                  <div 
-                    className="w-36 h-36 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group" 
+                  <div
+                    className="w-36 h-36 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {isUploadingPhoto ? (
@@ -1167,11 +1176,11 @@ export default function MembersContent() {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       </div>
                     ) : (photoPreview || (selectedMember?.photo && !selectedMember.photo.startsWith('data:'))) ? (
-                      <Image 
-                        src={photoPreview || selectedMember?.photo || ''} 
-                        alt={selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Profile'} 
-                        width={144} 
-                        height={144} 
+                      <Image
+                        src={photoPreview || selectedMember?.photo || ''}
+                        alt={selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Profile'}
+                        width={144}
+                        height={144}
                         className="w-full h-full object-cover object-top"
                       />
                     ) : (
@@ -1185,12 +1194,12 @@ export default function MembersContent() {
                       </div>
                     )}
                   </div>
-                  <input 
-                    ref={fileInputRef} 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handlePhotoUpload} 
-                    className="hidden" 
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
                   />
 
                   <div className="flex-1 space-y-4">
@@ -1290,9 +1299,9 @@ export default function MembersContent() {
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
                             <Label htmlFor="first_name">First Name *</Label>
-                            <Input 
-                              id="first_name" 
-                              value={formData.first_name} 
+                            <Input
+                              id="first_name"
+                              value={formData.first_name}
                               onChange={(e) => {
                                 setFormData({ ...formData, first_name: e.target.value })
                                 if (formErrors.first_name) {
@@ -1300,7 +1309,7 @@ export default function MembersContent() {
                                 }
                               }}
                               className={formErrors.first_name ? "border-destructive" : ""}
-                              required 
+                              required
                             />
                             {formErrors.first_name && (
                               <p className="text-xs text-destructive">{formErrors.first_name}</p>
@@ -1308,9 +1317,9 @@ export default function MembersContent() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="last_name">Last Name *</Label>
-                            <Input 
-                              id="last_name" 
-                              value={formData.last_name} 
+                            <Input
+                              id="last_name"
+                              value={formData.last_name}
                               onChange={(e) => {
                                 setFormData({ ...formData, last_name: e.target.value })
                                 if (formErrors.last_name) {
@@ -1318,7 +1327,7 @@ export default function MembersContent() {
                                 }
                               }}
                               className={formErrors.last_name ? "border-destructive" : ""}
-                              required 
+                              required
                             />
                             {formErrors.last_name && (
                               <p className="text-xs text-destructive">{formErrors.last_name}</p>
@@ -1330,10 +1339,10 @@ export default function MembersContent() {
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
                             <Label htmlFor="phone_number">Primary Phone Number</Label>
-                            <Input 
-                              id="phone_number" 
-                              type="tel" 
-                              value={formData.phone_number} 
+                            <Input
+                              id="phone_number"
+                              type="tel"
+                              value={formData.phone_number}
                               onChange={(e) => {
                                 setFormData({ ...formData, phone_number: e.target.value })
                                 if (formErrors.phone_number) {
@@ -1342,7 +1351,7 @@ export default function MembersContent() {
                               }}
                               className={formErrors.phone_number ? "border-destructive" : ""}
                               placeholder="+233 24 123 4567"
-                              required 
+                              required
                             />
                             {formErrors.phone_number && (
                               <p className="text-xs text-destructive">{formErrors.phone_number}</p>
@@ -1350,10 +1359,10 @@ export default function MembersContent() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="secondary_phone">Secondary Phone Number</Label>
-                            <Input 
-                              id="secondary_phone" 
-                              type="tel" 
-                              value={formData.secondary_phone} 
+                            <Input
+                              id="secondary_phone"
+                              type="tel"
+                              value={formData.secondary_phone}
                               onChange={(e) => {
                                 setFormData({ ...formData, secondary_phone: e.target.value })
                                 if (formErrors.secondary_phone) {
@@ -1373,18 +1382,18 @@ export default function MembersContent() {
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
                             <Label htmlFor="occupation">Occupation</Label>
-                            <Input 
-                              id="occupation" 
-                              value={formData.occupation} 
-                              onChange={(e) => setFormData({ ...formData, occupation: e.target.value })} 
+                            <Input
+                              id="occupation"
+                              value={formData.occupation}
+                              onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="email">Email Address</Label>
-                            <Input 
-                              id="email" 
-                              type="email" 
-                              value={formData.email} 
+                            <Input
+                              id="email"
+                              type="email"
+                              value={formData.email}
                               onChange={(e) => {
                                 setFormData({ ...formData, email: e.target.value })
                                 if (formErrors.email) {
@@ -1408,9 +1417,9 @@ export default function MembersContent() {
                               date={dateOfBirth}
                               onSelect={(date) => {
                                 setDateOfBirth(date)
-                                setFormData({ 
-                                  ...formData, 
-                                  date_of_birth: date ? date.toISOString().split('T')[0] : "" 
+                                setFormData({
+                                  ...formData,
+                                  date_of_birth: date ? date.toISOString().split('T')[0] : ""
                                 })
                               }}
                               placeholder="Select date"
@@ -1449,20 +1458,19 @@ export default function MembersContent() {
                         {/* Row 5: Spouse Name, Number of Children */}
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
-                            <Label htmlFor="spouse_name">Spouse Name (Optional)</Label>
-                            <Input 
-                              id="spouse_name" 
-                              value={formData.spouse_name} 
-                              onChange={(e) => setFormData({ ...formData, spouse_name: e.target.value })} 
+                            <SpouseAutocomplete
+                              value={formData.spouse_name}
+                              onChange={(value) => setFormData({ ...formData, spouse_name: value })}
+                              currentMemberId={selectedMemberUUID}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="number_of_children">Number of Children</Label>
-                            <Input 
-                              id="number_of_children" 
+                            <Input
+                              id="number_of_children"
                               type="number"
                               min="0"
-                              value={formData.number_of_children} 
+                              value={formData.number_of_children}
                               onChange={(e) => {
                                 setFormData({ ...formData, number_of_children: e.target.value })
                                 if (formErrors.number_of_children) {
@@ -1480,10 +1488,10 @@ export default function MembersContent() {
                         {/* Row 7: Address */}
                         <div className="space-y-2">
                           <Label htmlFor="address">Address</Label>
-                          <Textarea 
-                            id="address" 
-                            value={formData.address} 
-                            onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+                          <Textarea
+                            id="address"
+                            value={formData.address}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                             rows={3}
                           />
                         </div>
@@ -1492,26 +1500,26 @@ export default function MembersContent() {
                         <div className="grid gap-4 md:grid-cols-3">
                           <div className="space-y-2">
                             <Label htmlFor="city">City</Label>
-                            <Input 
-                              id="city" 
-                              value={formData.city} 
-                              onChange={(e) => setFormData({ ...formData, city: e.target.value })} 
+                            <Input
+                              id="city"
+                              value={formData.city}
+                              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="town">Town</Label>
-                            <Input 
-                              id="town" 
-                              value={formData.town} 
-                              onChange={(e) => setFormData({ ...formData, town: e.target.value })} 
+                            <Input
+                              id="town"
+                              value={formData.town}
+                              onChange={(e) => setFormData({ ...formData, town: e.target.value })}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="region">Region</Label>
-                            <Input 
-                              id="region" 
-                              value={formData.region} 
-                              onChange={(e) => setFormData({ ...formData, region: e.target.value })} 
+                            <Input
+                              id="region"
+                              value={formData.region}
+                              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
                             />
                           </div>
                         </div>
@@ -1519,10 +1527,10 @@ export default function MembersContent() {
                         {/* Row 9: Digital Address */}
                         <div className="space-y-2">
                           <Label htmlFor="digital_address">Digital Address</Label>
-                          <Input 
-                            id="digital_address" 
-                            value={formData.digital_address} 
-                            onChange={(e) => setFormData({ ...formData, digital_address: e.target.value })} 
+                          <Input
+                            id="digital_address"
+                            value={formData.digital_address}
+                            onChange={(e) => setFormData({ ...formData, digital_address: e.target.value })}
                             placeholder="e.g., GA-123-4567"
                           />
                         </div>
@@ -1531,7 +1539,7 @@ export default function MembersContent() {
                         <div className="mb-4 pt-4 border-t">
                           <p className="text-md font-semibold mb-4">Organization Information</p>
                         </div>
-                        
+
                         {/* Row 1: Join Date, Membership Status */}
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
@@ -1540,9 +1548,9 @@ export default function MembersContent() {
                               date={joinDate}
                               onSelect={(date) => {
                                 setJoinDate(date)
-                                setFormData({ 
-                                  ...formData, 
-                                  join_date: date ? date.toISOString().split('T')[0] : "" 
+                                setFormData({
+                                  ...formData,
+                                  join_date: date ? date.toISOString().split('T')[0] : ""
                                 })
                               }}
                               placeholder="Select date"
@@ -1601,19 +1609,19 @@ export default function MembersContent() {
                         {/* Row 4: Additional Notes */}
                         <div className="space-y-2">
                           <Label htmlFor="notes">Additional Notes</Label>
-                          <Textarea 
-                            id="notes" 
-                            value={formData.notes} 
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
-                            rows={5} 
-                            placeholder="Any additional information" 
+                          <Textarea
+                            id="notes"
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            rows={5}
+                            placeholder="Any additional information"
                           />
                         </div>
 
                         <div className="flex gap-2 pt-4">
-                          <Button 
-                            size="sm" 
-                            type="submit" 
+                          <Button
+                            size="sm"
+                            type="submit"
                             className="flex-1"
                             disabled={createMember.isPending || updateMember.isPending}
                           >
@@ -1627,10 +1635,10 @@ export default function MembersContent() {
                             )}
                           </Button>
                           {selectedMember && (
-                            <Button 
-                              size="sm" 
-                              type="button" 
-                              variant="destructive" 
+                            <Button
+                              size="sm"
+                              type="button"
+                              variant="destructive"
                               onClick={handleDeleteClick}
                               disabled={deleteMember.isPending || createMember.isPending || updateMember.isPending}
                             >
@@ -1659,57 +1667,78 @@ export default function MembersContent() {
                             </div>
                           ) : (
                             <>
-                              <div className="rounded-lg border">
-                                <div className="overflow-x-auto">
-                                  <table className="w-full">
-                                    <thead className="bg-muted/50">
-                                      <tr className="border-b">
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Amount</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Method</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {memberContributions
-                                        .sort((a, b) => {
-                                          const dateA = a.date instanceof Date ? a.date : new Date(a.date)
-                                          const dateB = b.date instanceof Date ? b.date : new Date(b.date)
-                                          return dateB.getTime() - dateA.getTime()
-                                        })
-                                        .map((record) => (
-                                          <tr key={record.id} className="border-b hover:bg-muted/30">
-                                            <td className="px-4 py-3 text-sm">
-                                              {formatRecordDate(record.date)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm">
-                                              <Badge variant="outline">{record.category}</Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                                              {record.reference || "-"}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm font-medium text-green-600">
-                                              {formatCurrency(record.amount || 0, organization?.currency || "USD")}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                                              {record.method}
-                                            </td>
-                                          </tr>
-                                        ))}
-                                    </tbody>
-                                  </table>
+                              <div className="space-y-4">
+                                {/* Stats Cards - Moved to Top */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <Card className="p-4">
+                                    <p className="text-sm text-muted-foreground mb-1">Total Contributions</p>
+                                    <p className="text-2xl font-bold">{formatCurrency(contributionStats.total, organization?.currency || "USD")}</p>
+                                  </Card>
+                                  <Card className="p-4">
+                                    <p className="text-sm text-muted-foreground mb-1">This Year</p>
+                                    <p className="text-2xl font-bold">{formatCurrency(contributionStats.thisYear, organization?.currency || "USD")}</p>
+                                  </Card>
                                 </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Card className="p-4">
-                                  <p className="text-sm text-muted-foreground mb-1">Total Contributions</p>
-                                  <p className="text-2xl font-bold">{formatCurrency(contributionStats.total, organization?.currency || "USD")}</p>
-                                </Card>
-                                <Card className="p-4">
-                                  <p className="text-sm text-muted-foreground mb-1">This Year</p>
-                                  <p className="text-2xl font-bold">{formatCurrency(contributionStats.thisYear, organization?.currency || "USD")}</p>
-                                </Card>
+
+                                {/* Category Filter */}
+                                <div className="flex justify-end">
+                                  <div className="w-[200px]">
+                                    <Select value={paymentCategoryFilter} onValueChange={setPaymentCategoryFilter}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="All Categories" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="all">All Categories</SelectItem>
+                                        {Array.from(new Set(memberContributions.map(r => r.category).filter(Boolean))).map(cat => (
+                                          <SelectItem key={cat} value={cat || "unknown"}>{cat}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-lg border">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-muted/50">
+                                        <tr className="border-b">
+                                          <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                                          <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+                                          <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
+                                          <th className="px-4 py-3 text-left text-sm font-medium">Amount</th>
+                                          <th className="px-4 py-3 text-left text-sm font-medium">Method</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {filteredContributions
+                                          .sort((a, b) => {
+                                            const dateA = a.date instanceof Date ? a.date : new Date(a.date)
+                                            const dateB = b.date instanceof Date ? b.date : new Date(b.date)
+                                            return dateB.getTime() - dateA.getTime()
+                                          })
+                                          .map((record) => (
+                                            <tr key={record.id} className="border-b hover:bg-muted/30">
+                                              <td className="px-4 py-3 text-sm">
+                                                {formatRecordDate(record.date)}
+                                              </td>
+                                              <td className="px-4 py-3 text-sm">
+                                                <Badge variant="outline">{record.category}</Badge>
+                                              </td>
+                                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {record.reference || "-"}
+                                              </td>
+                                              <td className="px-4 py-3 text-sm font-medium text-green-600">
+                                                {formatCurrency(record.amount || 0, organization?.currency || "USD")}
+                                              </td>
+                                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {record.method}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
                               </div>
                             </>
                           )}
@@ -1728,6 +1757,47 @@ export default function MembersContent() {
                           <div className="flex justify-between items-center">
                             <p className="text-md font-semibold">Attendance Records</p>
                           </div>
+
+                          {/* Attendance Stats & Filter */}
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <Card className="p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  <p className="text-sm text-muted-foreground">Total Present</p>
+                                </div>
+                                <p className="text-2xl font-bold text-green-600">
+                                  {memberAttendanceRecords.filter(r => r.status === 'present').length}
+                                </p>
+                              </Card>
+                              <Card className="p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <XCircle className="h-4 w-4 text-red-600" />
+                                  <p className="text-sm text-muted-foreground">Total Absent</p>
+                                </div>
+                                <p className="text-2xl font-bold text-red-600">
+                                  {memberAttendanceRecords.filter(r => r.status === 'absent').length}
+                                </p>
+                              </Card>
+                            </div>
+
+                            <div className="flex justify-end">
+                              <div className="w-[200px]">
+                                <Select value={attendanceEventTypeFilter} onValueChange={setAttendanceEventTypeFilter}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="All Events" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Events</SelectItem>
+                                    {Array.from(new Set(memberAttendanceRecords.map(r => r.service_type).filter(Boolean))).map(type => (
+                                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+
                           {memberAttendanceRecords.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                               No attendance records found for this member
@@ -1743,29 +1813,31 @@ export default function MembersContent() {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {memberAttendanceRecords.map((record) => (
-                                    <TableRow key={record.id}>
-                                      <TableCell className="font-medium whitespace-nowrap">
-                                        {formatDate(record.date)}
-                                      </TableCell>
-                                      <TableCell>{record.service_type}</TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center gap-2">
-                                          {record.status === 'absent' ? (
-                                            <>
-                                              <XCircle className="h-4 w-4 text-red-600" />
-                                              <span className="text-sm font-medium text-red-600">Absent</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                              <span className="text-sm font-medium text-green-600">Present</span>
-                                            </>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {memberAttendanceRecords
+                                    .filter(r => attendanceEventTypeFilter === "all" || r.service_type === attendanceEventTypeFilter)
+                                    .map((record) => (
+                                      <TableRow key={record.id}>
+                                        <TableCell className="font-medium whitespace-nowrap">
+                                          {formatDate(record.date)}
+                                        </TableCell>
+                                        <TableCell>{record.service_type}</TableCell>
+                                        <TableCell>
+                                          <div className="flex items-center gap-2">
+                                            {record.status === 'absent' ? (
+                                              <>
+                                                <XCircle className="h-4 w-4 text-red-600" />
+                                                <span className="text-sm font-medium text-red-600">Absent</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                <span className="text-sm font-medium text-green-600">Present</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
                                 </TableBody>
                               </Table>
                             </div>
@@ -1872,7 +1944,7 @@ export default function MembersContent() {
           <SheetHeader>
             <SheetTitle>Import Members</SheetTitle>
           </SheetHeader>
-          
+
           <div className="space-y-6 mt-6">
             {/* Download Sample Section */}
             <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
@@ -1892,9 +1964,8 @@ export default function MembersContent() {
             <div className="space-y-4">
               <Label>Upload Excel File</Label>
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-                }`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+                  }`}
                 onDragEnter={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -1913,15 +1984,15 @@ export default function MembersContent() {
                   e.preventDefault()
                   e.stopPropagation()
                   setDragActive(false)
-                  
+
                   const files = Array.from(e.dataTransfer.files)
-                  const excelFile = files.find(file => 
-                    file.name.endsWith('.xlsx') || 
+                  const excelFile = files.find(file =>
+                    file.name.endsWith('.xlsx') ||
                     file.name.endsWith('.xls') ||
                     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
                     file.type === 'application/vnd.ms-excel'
                   )
-                  
+
                   if (excelFile) {
                     setUploadFile(excelFile)
                   } else {
@@ -1937,9 +2008,9 @@ export default function MembersContent() {
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) {
-                      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || 
-                          file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-                          file.type === 'application/vnd.ms-excel') {
+                      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ||
+                        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                        file.type === 'application/vnd.ms-excel') {
                         setUploadFile(file)
                       } else {
                         toast.error('Please upload an Excel file (.xlsx or .xls)')
@@ -1991,7 +2062,7 @@ export default function MembersContent() {
                   setIsUploading(true)
                   try {
                     const data = await parseExcelFile(uploadFile)
-                    
+
                     if (data.length === 0) {
                       toast.error('No data found in the Excel file')
                       setIsUploading(false)

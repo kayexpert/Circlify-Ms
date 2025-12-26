@@ -35,9 +35,10 @@ export function useProjectCategories() {
       return (data || []) as ProjectCategory[]
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - categories change less often
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (categories change less frequently)
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 

@@ -72,8 +72,10 @@ export function useNotificationSettings() {
       } as NotificationSettings
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute - settings change less often
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
@@ -162,8 +164,8 @@ export function useUpdateNotificationSettings() {
         error instanceof Error
           ? error.message
           : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : "Failed to update notification settings"
+            ? String(error.message)
+            : "Failed to update notification settings"
       toast.error(errorMessage)
     },
   })

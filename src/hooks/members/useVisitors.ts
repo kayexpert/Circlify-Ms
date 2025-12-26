@@ -70,9 +70,10 @@ export function useVisitors() {
       return (data || []).map(convertVisitor)
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }
@@ -125,9 +126,10 @@ export function useVisitorsPaginated(page: number = 1, pageSize: number = 20) {
       }
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
     refetchOnReconnect: true,
   })
 }

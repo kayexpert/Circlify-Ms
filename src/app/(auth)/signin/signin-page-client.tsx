@@ -20,6 +20,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/auth/page-transition";
 import { AuthPrimaryButton, AuthGoogleButton } from "@/components/auth/auth-components";
+import { useQueryClient } from "@tanstack/react-query";
 
 const signInSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -49,6 +50,7 @@ export function SignInPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const supabase = useSupabase();
+  const queryClient = useQueryClient();
 
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -98,9 +100,13 @@ export function SignInPageClient() {
 
       toast.success("Signed in successfully!");
 
+      // Clear any stale queries (like organization) that might have cached "null" while logged out.
+      // This prevents the dashboard layout from hanging on "Redirecting..."
+      queryClient.invalidateQueries();
+
       // Redirect to dashboard - let the dashboard layout handle the organization check
       router.push("/dashboard");
-      router.refresh();
+      router.refresh(); // Force server components to re-render with new session
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("Sign in error:", error);
@@ -113,7 +119,7 @@ export function SignInPageClient() {
       toast.error(message);
       setIsLoading(false);
     }
-  }, [supabase, router]);
+  }, [supabase, router, queryClient]);
 
   const signInWithGoogle = React.useCallback(async () => {
     if (!supabase) {

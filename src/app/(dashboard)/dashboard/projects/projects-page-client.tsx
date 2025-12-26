@@ -2,10 +2,14 @@
 
 import React, { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useProjectsRealtime } from "@/hooks/use-realtime-subscription"
 import { ProjectsContent } from "./ProjectsContent"
 import { CategoriesContent } from "./CategoriesContent"
 
 export function ProjectsPageClient() {
+  // Enable real-time subscriptions for live updates
+  useProjectsRealtime()
+
   const [activeTab, setActiveTab] = useState("projects")
 
   return (

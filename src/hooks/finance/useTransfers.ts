@@ -35,7 +35,9 @@ export function useTransfers() {
       return (data || []).map(convertTransfer)
     },
     enabled: !!organization?.id && !orgLoading,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds - for real-time updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch on window focus
   })
 }
 
