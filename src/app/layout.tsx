@@ -5,9 +5,10 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ReactQueryProvider } from "@/lib/react-query/provider";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import GoogleAnalytics from "@/components/analytics/google-analytics";
 
-const outfit = Outfit({ 
-  subsets: ["latin"], 
+const outfit = Outfit({
+  subsets: ["latin"],
   variable: "--font-outfit",
   display: "swap",
   weight: ["400", "500", "600", "700"],
@@ -63,6 +64,7 @@ export default function RootLayout({
           <ReactQueryProvider>
             {children}
             <Toaster />
+            <GoogleAnalytics />
           </ReactQueryProvider>
         </ThemeProvider>
       </body>
